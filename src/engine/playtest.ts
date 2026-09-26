@@ -126,7 +126,7 @@ export async function playGame(bot: Bot, opts: { gameId: string; seed: number; t
 export function formatTrace(trace: readonly TurnTrace[]): string[] {
   return trace.map((t) => {
     const b = t.bars
-    const fired = t.fired.map((f) => `${f.butterfly ? '🦋' : '🌍'}${EFFECTS[f.effectId].label}`).join(' ')
+    const fired = t.fired.map((f) => `${f.butterfly ? 'kelebek' : 'dünya'}: ${EFFECTS[f.effectId].label}`).join(' ')
     const decisions = t.decisions.map((d) => EFFECTS[d].label).join(', ')
     return `t${String(t.turn).padStart(2)} onay ${b.approval} ist ${b.stability} eko ${b.economy} ref ${b.welfare} ask ${b.military} | ${decisions} ${fired}`
   })

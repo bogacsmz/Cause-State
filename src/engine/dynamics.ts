@@ -1,6 +1,7 @@
 import { EFFECTS } from '@shared/game/catalog'
-import { BAR_IDS, type BarId, type Bars } from '@shared/game/primitives'
-import type { BarCause, Country, GameState } from '@shared/game/schema'
+import { BAR_IDS, countryRef, type BarId, type Bars } from '@shared/game/primitives'
+import type { ActiveEffect, BarCause, Country, GameState } from '@shared/game/schema'
+import { entityName } from './lookup'
 import type { Rng } from './rng'
 
 // How the world moves on its own each turn. Every number that shapes the game's feel
@@ -73,7 +74,7 @@ export function tickBars(next: GameState, startBars: ReadonlyMap<string, Bars>, 
     for (const m of effect.modifiers) {
       if (m.mode === 'once' && effect.appliedTurn !== next.turn) continue
       add(m.country, m.bar, {
-        label: EFFECTS[effect.effectId].label,
+        label: causeLabel(next, effect, m.country),
         delta: m.delta,
         kind: 'effect',
         effectId: effect.effectId,
@@ -91,6 +92,17 @@ export function tickBars(next: GameState, startBars: ReadonlyMap<string, Bars>, 
     drift(country, startBars.get(country.id) ?? country.bars, next.turn, rng, (bar, cause) => add(country.id, bar, cause))
   }
   return causes
+}
+
+/**
+ * Names an effect from the affected country's side: "Yaptırım · Yunanistan" when Greece did
+ * it, "Yaptırım → Yunanistan" when it was aimed at Greece, just "Yaptırım" when it is home-grown.
+ */
+function causeLabel(state: GameState, effect: ActiveEffect, affected: string): string {
+  const label = EFFECTS[effect.effectId].label
+  if (effect.actor !== affected) return `${label} · ${entityName(state, countryRef(effect.actor))}`
+  const aimedAt = effect.target.type === 'province' || effect.target.id !== affected ? effect.target : null
+  return aimedAt ? `${label} → ${entityName(state, aimedAt)}` : label
 }
 
 function drift(country: Country, start: Bars, turn: number, rng: Rng, add: (bar: BarId, cause: BarCause) => void): void {

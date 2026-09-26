@@ -23,17 +23,17 @@ const cols: Array<[string, (rs: GameResult[]) => string]> = [
   ['2.seçim', (rs) => pct(rs.filter((r) => r.electionsWon >= 2).length, rs.length)],
   ['darbe', (rs) => pct(rs.filter((r) => r.ending === 'coup').length, rs.length)],
   ['ort.1.oy', (rs) => avg(rs.flatMap((r) => r.votes.slice(0, 1)))],
-  ['🦋≤15.tur', (rs) => pct(rs.filter((r) => r.firstButterfly !== null && r.firstButterfly <= 15).length, rs.length)],
-  ['ilk🦋', (rs) => avg(rs.flatMap((r) => (r.firstButterfly === null ? [] : [r.firstButterfly])))],
-  ['🦋/oyun', (rs) => avg(rs.map((r) => r.butterflies))],
-  ['🌍/oyun', (rs) => avg(rs.map((r) => r.worldEvents))],
+  ['kelebek≤15', (rs) => pct(rs.filter((r) => r.firstButterfly !== null && r.firstButterfly <= 15).length, rs.length)],
+  ['ilk kelebek', (rs) => avg(rs.flatMap((r) => (r.firstButterfly === null ? [] : [r.firstButterfly])))],
+  ['kelebek/oyun', (rs) => avg(rs.map((r) => r.butterflies))],
+  ['dünya/oyun', (rs) => avg(rs.map((r) => r.worldEvents))],
   ['min.istikrar', (rs) => avg(rs.map((r) => r.minStability))]
 ]
 
 console.log(`${GAMES} oyun × en çok ${TURNS} tur, bot başına\n`)
-console.log(['bot'.padEnd(9), ...cols.map(([h]) => h.padStart(12))].join(''))
+console.log(['bot'.padEnd(9), ...cols.map(([h]) => h.padStart(14))].join(''))
 for (const [name, bot] of Object.entries(BOTS)) {
   const results: GameResult[] = []
   for (let i = 0; i < GAMES; i++) results.push(await playGame(bot, { gameId: `pt-${name}-${i}`, seed: 1000 + i, turns: TURNS }))
-  console.log([name.padEnd(9), ...cols.map(([, f]) => f(results).padStart(12))].join(''))
+  console.log([name.padEnd(9), ...cols.map(([, f]) => f(results).padStart(14))].join(''))
 }

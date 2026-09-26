@@ -7,7 +7,7 @@ Tasarım belgeleri kod reposunda değil, vault'ta durur (`bogacsmz/obsidian_vaul
 - `Tasarim-Fikirleri.md`: onaylanmış mekanikler ve elenen fikirler (elenenleri tekrar önerme)
 - `Kararlar.md`
 
-Durum: Faz 0 (iskelet) ve Faz 0.5 (sözleşme: şema, SQLite hafıza, öner→doğrula→onar) bitti. Sıradaki: Faz 1, salt metin çekirdek döngü ve eğlence kanıtı (tek ülke Türkiye, sahte yapay zeka).
+Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme) ve Faz 1 (salt metin oynanabilir çekirdek + eğlence kanıtı, senaryo yapay zekasıyla) bitti. Sıradaki: Faz 2, `scripted-ai.ts` yerine gerçek Claude (aynı ChangeList sözleşmesi, `resolveTurn`'e proposer olarak).
 
 ## Mimari (kod = tek gerçek, LLM = sadece bulanık iş)
 
@@ -19,9 +19,17 @@ Durum: Faz 0 (iskelet) ve Faz 0.5 (sözleşme: şema, SQLite hafıza, öner→do
 - `src/engine/`: saf, deterministik çekirdek. Electron/Node bağımlılığı yok.
   - `referee.ts`: `reviewChangeList` tek kapı. Önce şema, sonra kurallar. Hata mesajları LLM'in onarabileceği İngilizce metin.
   - `loop.ts`: öner → doğrula → onar (sınırlı deneme).
-  - `turn.ts`: `applyTurn(state, action) → { newState, events, seeds, narration }`. Sadece `ApprovedChangeList` alır.
+  - `turn.ts`: `applyTurn(state, action) → { newState, events, seeds, seedUpdates, narration, report }`. Sadece `ApprovedChangeList` alır. Sıra: kararlar ve patlayan tohumlar etkiye dönüşür → barlar hareket eder → süresi biten etkiler düşer → seçim → darbe zarı → sermaye dolar.
+  - `dynamics.ts`: barların kendi hareketi (onay/istikrar/refah hedefe oransal, ekonomi uzun vadeli seviyesine, piyasa dalgalanması) ve darbe şansı. Dengeyi değiştirmek = `DYNAMICS` tablosu + `catalog.ts` rakamları.
+  - `seeds.ts`: `planSeeds`, tohumun ne zaman patlayacağına AI'dan önce kod karar verir (anahtarlı zar). AI sadece sonucunu önerir (`seedOutcomes`).
+  - `scripted-ai.ts`: Faz 1'in sahte yapay zekası. Emir yorumlama (anahtar kelime), bedava danışman, tohum ve dünya gündemi senaryoları, anlatım. Gerçek LLM ile aynı ChangeList'i üretir ve hakemden geçer.
+  - `resolve.ts`: `resolveTurn`, bir tur uçtan uca: planSeeds → öner→doğrula→onar → applyTurn.
+  - `view.ts`: `buildView`, arayüzün çizdiği `GameView` (etiketler dahil; arayüz motoru yüklemez).
+  - `playtest.ts`: denge botları (boş, rastgele, popülist, otoriter, dengeli). `tests/game/balance.test.ts` eğlence sözleşmesini sayılarla korur.
   - `context.ts`: `buildTurnRequest`, her tur aynı üst sınırda bağlam.
   - `rng.ts`: tohumlu zar. Durum `GameState.rng` içinde; aynı tohum aynı oyunu verir.
+- `src/main/game/`: `GameSession` (tek kayıt dosyası, bu ayın kararları, danışman sohbeti; çağrılar sıraya girer) ve `game:*` IPC kanalları. Arayüzden gelen her argüman burada doğrulanır.
+- `src/shared/tr.ts`: sayılardan sonra doğru Türkçe ek (`ek(3, 'de')` → "3'te"). Sayıya elle `'de`/`'e` yazma.
 - `src/main/store/`: SQLite hafıza (Node'un yerleşik `node:sqlite` + Drizzle sqlite-proxy; yerel modül yok).
   - Bir kayıt = bir dosya: `snapshots`, `events`, `seeds` ve entity/etiket bağlantı tabloları.
   - Olay kaydı sadece eklenir, silinmez. Tohumlar durum değiştirir (dormant → fired/defused), silinmez.
@@ -45,7 +53,9 @@ Durum: Faz 0 (iskelet) ve Faz 0.5 (sözleşme: şema, SQLite hafıza, öner→do
 ```bash
 npm run typecheck && npm test && npm run build
 npm run kanit                                            # Faz 0.5 sözleşme kanıtı (metin raporu)
+npm run playtest                                         # denge tablosu (bot başına 200 oyun)
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run smoke   # Linux; Mac'te sadece: npm run smoke
+xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli   # 20 tur, her tur ekran görüntüsü
 ```
 
 Arayüz değişikliklerinde `test-results/` altındaki ekran görüntülerine bak. "Testler geçti" demek "çalışıyor" demek değil.

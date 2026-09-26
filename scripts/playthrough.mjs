@@ -82,6 +82,14 @@ try {
       if (available((await view()), 'regional_investment', 'İzmir')) await order("İzmir'e yatırım yap")
       if (v.turn === 2) await order('Yunanistan hükümetine nota ver')
     },
+    // Whatever pleases voters this month, every month.
+    async populist(v) {
+      if (v.turn % 4 === 1) await order('Durum nedir?')
+      if (available(v, 'tax_cut')) await order('Vergileri indir')
+      if (available((await view()), 'fiscal_stimulus')) await order('Teşvik paketi açıkla, ekonomiyi canlandır')
+      if (available((await view()), 'anti_corruption_drive')) await card('Yolsuzlukla mücadele')
+      if (available((await view()), 'regional_investment', 'İstanbul')) await card('Bölgesel yatırım', 'İstanbul')
+    },
     // Rules by force: censorship, army, sanctions.
     async otoriter(v) {
       if (v.turn % 4 === 1) await order('Durum nedir?')
@@ -114,9 +122,9 @@ try {
     v = await view()
     const r = v.report
     say(`Tur ${v.turn} sonucu: ${bars(v)}`)
-    for (const f of r.firedSeeds) say(`  ${f.source ? '🦋 KELEBEK' : '🌍 DÜNYA'}: ${f.effectId} — kaynağı tur ${f.plantedTurn} · ${f.origin}`)
-    if (r.election) say(`  🗳  SEÇİM: oy %${r.election.vote}, baraj %${r.election.threshold} → ${r.election.won ? 'KAZANDI' : 'KAYBETTİ'}`)
-    if (r.coup) say(`  ⚠ darbe riski %${Math.round(r.coup.chance * 100)} → ${r.coup.happened ? 'DARBE OLDU' : 'olmadı'}`)
+    for (const f of r.firedSeeds) say(`  ${f.source ? 'KELEBEK' : 'DÜNYA'}: ${f.effectId} — kaynağı tur ${f.plantedTurn} · ${f.origin}`)
+    if (r.election) say(`  SEÇİM: oy %${r.election.vote}, baraj %${r.election.threshold} → ${r.election.won ? 'KAZANDI' : 'KAYBETTİ'}`)
+    if (r.coup) say(`  UYARI: darbe riski %${Math.round(r.coup.chance * 100)} → ${r.coup.happened ? 'DARBE OLDU' : 'olmadı'}`)
     const headline = v.feed.filter((e) => e.turn === v.turn && e.kind === 'narration').at(-1)
     if (headline) say(`  manşet: ${headline.title}`)
     await shot(`${String(v.turn).padStart(2, '0')}b-sonuc.png`)

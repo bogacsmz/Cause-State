@@ -493,14 +493,20 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
       : quietLine(state),
     ...reactionLines,
     ...worldLines,
-    turnsLeft > 0 && turnsLeft <= 3 ? `Seçime ${turnsLeft} ay kaldı.` : ''
+    turnsLeft > 0 && turnsLeft <= 3 ? `Seçime ${turnsLeft} ay kaldı.` : '',
+    turnsLeft === 0 ? 'Seçmen bu ay sandığa gidiyor; hükümetin kaderi oy pusulalarında.' : ''
   ]
     .filter(Boolean)
     .join(' ')
 
   const firstDecision = input.decisions[0]
+  const electionDay = turnsLeft === 0
   const headline =
-    seedHeadlines[0] ?? (firstDecision ? HEADLINES[firstDecision.effectId] : undefined) ?? worldTeaser ?? quietHeadline(state, turn)
+    seedHeadlines[0] ??
+    (electionDay ? 'Türkiye sandık başında' : undefined) ??
+    (firstDecision ? HEADLINES[firstDecision.effectId] : undefined) ??
+    worldTeaser ??
+    quietHeadline(state, turn)
 
   return {
     interpretation:

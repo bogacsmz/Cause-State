@@ -1180,16 +1180,6 @@ kbd {
   color: #8db4cf;
 }
 
-.echo__tag::before {
-  content: '🦋 ';
-  letter-spacing: 0;
-}
-
-.echo--world .echo__tag::before,
-.sheet__echo--world .echo__tag::before {
-  content: '🌍 ';
-}
-
 .echo__title {
   margin: 4px 0 5px;
   font-family: var(--font-serif);

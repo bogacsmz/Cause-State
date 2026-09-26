@@ -98,6 +98,14 @@ describe('applyTurn', () => {
     )
   })
 
+  it('says who is behind a change, seen from your side', () => {
+    const state = createNewGame({ gameId: 'test', seed: 42 })
+    const { report } = applyTurn(state, { order: ORDER, changes: approve(state, VALID_CHANGES), plan: NO_SEEDS })
+    const labels = (bar: string) => report.bars.find((b) => b.bar === bar)!.causes.map((c) => c.label)
+    expect(labels('economy')).toContain('Ticaret anlaşması → Yunanistan')
+    expect(labels('reputation')).toEqual(expect.arrayContaining(['AB üyelik başvurusu', 'Diplomatik nota · Fransa']))
+  })
+
   it('ends effects after their duration', () => {
     let state = createNewGame({ gameId: 'test', seed: 1 })
     const tax: ChangeList = { ...EMPTY, changes: [{ effectId: 'tax_cut', target: { type: 'country', id: 'TUR' }, reason: 'x' }] }
