@@ -15,7 +15,8 @@ async function games(bot: string): Promise<GameResult[]> {
 }
 const share = (rs: GameResult[], f: (r: GameResult) => boolean): number => rs.filter(f).length / rs.length
 
-describe('balance (bots through the real pipeline)', () => {
+// Hundreds of simulated games: give them room on a busy machine (the default is 5 s per test).
+describe('balance (bots through the real pipeline)', { timeout: 60_000 }, () => {
   it('doing nothing loses the first election most of the time', async () => {
     expect(share(await games('bos'), (r) => r.electionsWon >= 1)).toBeLessThan(0.25)
   })
