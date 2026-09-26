@@ -7,9 +7,6 @@ import type { ActionResult, GameProgress, GameView } from './game/view'
 
 export const IPC = {
   aiStatus: 'ai:status',
-  aiAsk: 'ai:ask',
-  aiCancel: 'ai:cancel',
-  aiEvent: 'ai:event',
   gameView: 'game:view',
   gameNew: 'game:new',
   gameCommand: 'game:command',
@@ -49,22 +46,6 @@ export interface AiResult {
   durationMs: number
 }
 
-export interface AskRequest {
-  id: string
-  prompt: string
-}
-
-export type AiEvent =
-  | { id: string; type: 'delta'; text: string }
-  | { id: string; type: 'done'; result: AiResult }
-  | { id: string; type: 'error'; message: string }
-
-export interface AskHandlers {
-  onDelta: (text: string) => void
-  onDone: (result: AiResult) => void
-  onError: (message: string) => void
-}
-
 /** The game, run by the main process. Every call returns the fresh view to render. */
 export interface GameBridge {
   view: () => Promise<GameView>
@@ -82,9 +63,8 @@ export interface GameBridge {
 export interface CsBridge {
   platform: string
   ai: {
+    /** Whether Claude can be reached, for the status pill. The game talks to Claude through `game`. */
     status: () => Promise<AiStatus>
-    /** Starts a streamed answer. Returns a function that cancels it. */
-    ask: (prompt: string, handlers: AskHandlers) => () => void
   }
   game: GameBridge
 }

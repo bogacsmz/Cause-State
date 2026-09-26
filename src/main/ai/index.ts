@@ -1,4 +1,4 @@
-import { DEFAULT_API_MODEL, type AiConfig } from '../config'
+import { DEFAULT_MODEL, type AiConfig } from '../config'
 import { AnthropicApiProvider } from './anthropic-api'
 import { ClaudeCliProvider } from './claude-cli'
 import { resolveClaude } from './find-claude'
@@ -10,11 +10,11 @@ export function createProvider(config: AiConfig, deps: { workDir: string }): Llm
     case 'mock':
       return new MockProvider()
     case 'api':
-      return new AnthropicApiProvider({ apiKey: config.apiKey, model: config.model ?? DEFAULT_API_MODEL })
+      return new AnthropicApiProvider({ apiKey: config.apiKey, model: config.model ?? DEFAULT_MODEL })
     case 'cli':
       return new ClaudeCliProvider({
         workDir: deps.workDir,
-        model: config.model,
+        model: config.model ?? DEFAULT_MODEL,
         resolveCommand: () => resolveClaude({ override: config.claudePath })
       })
   }

@@ -24,7 +24,8 @@
     "kanit": "tsx --tsconfig tsconfig.node.json scripts/faz05-kanit.mts",
     "playtest": "tsx --tsconfig tsconfig.node.json scripts/playtest.mts",
     "playthrough": "node scripts/playthrough.mjs",
-    "record:claude": "tsx --tsconfig tsconfig.node.json scripts/record-claude-fixtures.mts"
+    "record:claude": "tsx --tsconfig tsconfig.node.json scripts/record-claude-fixtures.mts",
+    "kanit:faz2": "tsx --tsconfig tsconfig.node.json scripts/faz2-kanit.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

@@ -1,10 +1,15 @@
 import type { ProviderId } from '@shared/ipc'
 
-export const DEFAULT_API_MODEL = 'claude-opus-5'
+/**
+ * The game's model. Chosen by a side-by-side run against Sonnet 5 (scripts/model-compare.mts):
+ * both proposed valid moves every time; Opus 5.5 answered faster, wrote tighter Turkish news
+ * with the origin of each butterfly spelled out, and cost the same per turn.
+ */
+export const DEFAULT_MODEL = 'claude-opus-5-5'
 
 export interface AiConfig {
   provider: ProviderId
-  /** Model override. CLI: passed as --model (otherwise Claude Code's default). API: defaults to DEFAULT_API_MODEL. */
+  /** Model override (CS_AI_MODEL); otherwise DEFAULT_MODEL for both the CLI and the API. */
   model?: string
   /** Only read when provider is 'api'; never handed to the CLI. */
   apiKey?: string

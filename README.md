@@ -2,12 +2,12 @@
 
 Kararlarının kelebek etkisiyle geri döndüğü, yapay zeka destekli modern dünya strateji oyunu. Tek oyunculu, tamamen senin bilgisayarında çalışan bir masaüstü uygulaması. Oyunu Claude yönetir, kuralları kod korur.
 
-> Durum: **Faz 1 tamam: oyun oynanıyor (salt metin, senaryo yapay zekası).**
-> - Türkiye'yi yönetiyorsun. Her ay 3 siyasi sermaye, her karar 1 puan; danışmanla konuşmak bedava.
-> - Barlar her ay kendi kendine de oynar; her değişimin nedeni tur sonu raporunda yazar.
-> - Kararların aylar sonra geri döner (kelebek etkisi). Dünya da boş durmaz.
-> - Her 12 ayda seçim var. Onayın barajın altındaysa kaybedersin; istikrar çökerse ordu darbe yapar.
-> - Sıradaki: Faz 2, senaryo yapay zekasının yerine gerçek Claude. Harita Faz 3'te.
+> Durum: **Faz 2 tamam: gerçek Claude oynuyor.** Harita Faz 3'te.
+> - Türkiye'yi yönetiyorsun ve emir kutusuna ne istersen yazıyorsun. Claude emrini etki sözlüğündeki hamlelere çevirir, hakem (kod) onaylar, sayıları kod hesaplar.
+> - Soru sormak bedava ("Durum nedir?", "Vergileri indirsem ne olur?"); emirler siyasi sermaye yakar (her ay 3).
+> - İmkânsız bir emir verirsen ("Dünyayı fethet") hakem reddeder, Claude girişimin bedelini anlatır.
+> - Ay sonunda Claude dünyayı oynar: diğer ülkeler hamle yapar, kararların aylar sonra kelebek olarak geri döner, haberi Claude yazar.
+> - Her 12 ayda seçim var; onayın barajın altındaysa kaybedersin, istikrar çökerse ordu darbe yapar.
 >
 > Yol haritası: vault'taki `Oyun/Yol-Haritasi.md`.
 
@@ -30,12 +30,13 @@ npm run dev
 ## Nasıl oynanır
 
 - **Ortada devlet masası:** anket ve seçim sayacı, barlar, yürürlükteki etkiler. Bir bara tıklarsan bu ay neden değiştiğini görürsün.
-- **Karar kartları:** her kart ne yaptığını ve bedelini rakamla gösterir. "Karar ver" dersen bu ayın kararlarına eklenir, alttaki çipten geri alabilirsin.
-- **Emir kutusu:** "vergileri indir", "Almanya ile ticaret anlaşması imzala", "İzmir'e yatırım yap" gibi yazabilirsin. Soru sorarsan ("durum nedir?") danışman bedava cevap verir.
-- **Turu bitir** (Ctrl+Enter): bir ay geçer, tur sonu raporu açılır. Geri dönen bir karar varsa en üstte "Kelebek etkisi" olarak görünür.
-- **Sağda brifing:** her ayın manşeti, geri dönen kararlar, dünya gündemi ve danışmanla konuşmaların.
+- **Emir kutusu (asıl oyun):** ne istersen kendi cümlenle yaz: "Suriye sınırına asker yığ ve Rusya ile gizli görüşme ayarla", "Enflasyonla mücadele et ama dar gelirliyi ezme". Kabinenin cevabı sağda akarak gelir; kararlar alttaki çiplere eklenir, istersen geri alırsın. Hakemin reddettiği bir şey olursa üstü çizili olarak ve nedeniyle görünür.
+- **Soru sormak bedava:** "Durum nedir?", "Seçimi kazanır mıyız?", "Vergileri indirsem ne olur?". Konuşulan hamlelerin gerçek rakamları cevabın altında görünür.
+- **Hazır kararlar:** kartlar kısayoldur; her kart ne yaptığını ve bedelini rakamla gösterir.
+- **Turu bitir** (Ctrl+Enter): Claude dünyayı oynar, hakem kontrol eder, kod uygular, haber brifinge akarak yazılır. Sonra tur sonu raporu açılır; geri dönen bir karar varsa en üstte "Kelebek etkisi" olarak görünür.
+- **Sağda brifing:** her ayın manşeti, geri dönen kararlar, diğer ülkelerin hamleleri ve kabineyle konuşmaların.
 
-Oyun kendini otomatik kaydeder: uygulama klasöründe `saves/` altında her oyun ayrı bir SQLite dosyası. "Yeni oyun" eskisini silmez.
+Oyun kendini otomatik kaydeder: uygulama klasöründe `saves/` altında her oyun ayrı bir SQLite dosyası. "Yeni oyun" eskisini silmez. Her kaydın yanında bir `.log.jsonl` dosyası da tutulur: Claude'a giden her istek, cevabı ve hakemin kararı. İleride oyuna özel küçük bir modeli eğitmek için veri seti olur.
 
 ## Gerçek uygulama olarak kurmak
 
@@ -47,16 +48,18 @@ npm run package
 
 ## Yapay zeka ayarları
 
-> Faz 1'de oyun henüz Claude'u çağırmaz: emirleri kurallı bir senaryo yapay zekası yorumlar. Aşağıdaki ayarlar Faz 2'de devreye girer. Üst çubuktaki "Senaryo YZ" etiketinin üstüne gelirsen Claude bağlantısının hazır olup olmadığını görürsün.
+Varsayılan olarak oyun **Claude aboneliğini** kullanır: bilgisayarındaki resmi `claude -p` komutunu çağırır. Ayrıca bir şey yapman gerekmez. Model varsayılanı **Claude Opus 5.5**: Sonnet 5 ile yan yana denendi, ikisi de hep geçerli hamle önerdi, Opus 5.5 daha hızlı cevap verdi ve daha iyi Türkçe haber yazdı, maliyeti aynıydı.
 
-Varsayılan olarak oyun **Claude aboneliğini** kullanır: bilgisayarındaki resmi `claude -p` komutunu çağırır. Ayrıca bir şey yapman gerekmez.
+Claude'a ulaşılamazsa (kurulu değil, limit doldu) oyun durmaz: Faz 1'in kurallı yapay zekası devreye girer ve bunu ekranda söyler. `CS_AI_PROVIDER=mock` ile oyun tamamen çevrimdışı bu kurallı yapay zekayla oynanır.
+
+Bir tur (ayın hamleleri + haber) yaklaşık 20-30 saniye sürer; bir emrin okunması 6-10 saniye.
 
 Değiştirmek istersen `.env.example` dosyasını `.env` adıyla kopyala ve düzenle:
 
 | Ayar | Ne işe yarar |
 |---|---|
-| `CS_AI_PROVIDER` | `cli` (abonelik, varsayılan), `api` (API anahtarı) ya da `mock` (sahte, test için) |
-| `CS_AI_MODEL` | İsteğe bağlı model. Örn. `opus`, `sonnet` ya da API için tam model kimliği |
+| `CS_AI_PROVIDER` | `cli` (abonelik, varsayılan), `api` (API anahtarı) ya da `mock` (çevrimdışı, kurallı yapay zeka) |
+| `CS_AI_MODEL` | İsteğe bağlı model. Varsayılan `claude-opus-5-5`; örn. `claude-sonnet-5` |
 | `ANTHROPIC_API_KEY` | Sadece `api` modunda okunur. Abonelik yoluna asla verilmez |
 | `CS_CLAUDE_PATH` | `claude` bulunamazsa tam yolu |
 
@@ -78,9 +81,11 @@ Abonelik yolunda oyun şunlara dikkat eder:
 | `npm run playthrough -- strategy=planli` | Derlenmiş uygulamayı oyuncu gibi 20 tur oynar, her turun ekran görüntüsünü ve kaydını alır (`planli`, `populist`, `otoriter`) |
 | `npm run playtest` | Denge testi: botlar yüzlerce oyun oynar, kazanma/darbe/kelebek oranlarını tablo yapar |
 | `npm run kanit` | Faz 0.5 kanıtı: oyun kaydı, hakem, olay/tohum sorguları ve bağlam boyutu raporu |
+| `npm run kanit:faz2` | Faz 2 kanıtı, gerçek Claude ile: yaratıcı ve absürt emir, bedava soru, dış hamle, çeşitlilik, kelebek, tur 5/50/500 bağlam boyutu (`test-results/faz2/`) |
+| `npm run record:claude` | Testlerin kullandığı gerçek Claude cevaplarını yeniden kaydeder (`tests/fixtures/claude/`) |
 | `npm run db:generate` | Kayıt şeması değişince SQL göçünü üretir |
 
-Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
+Testler canlı Claude çağırmaz: gerçek Claude cevapları kaydedilmiştir ve testler onları oynatır. Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
 
 ```bash
 CS_LIVE_CLI=1 npx vitest run tests/live-cli.test.ts
@@ -90,17 +95,17 @@ CS_LIVE_CLI=1 npx vitest run tests/live-cli.test.ts
 
 ```text
 src/shared/game/  Oyunun şeması: durum, olay, tohum, etki sözlüğü, kod↔yapay zeka sözleşmesi, ekran görünümü
-src/engine/       Saf oyun motoru: tur, barların hareketi, kelebek tohumları, hakem, senaryo yapay zekası, denge botları
+src/engine/       Saf oyun motoru: tur, barların hareketi, kelebek tohumları, dış hamle sırası, hakem, kurallı yapay zeka, denge botları
 src/main/         Uygulamanın ana süreci: pencere, oyun oturumu, yapay zeka çağrıları
-  game/           Oyun oturumu (kayıt dosyası, bu ayın kararları, danışman) ve pencere kanalları
+  game/           Oyun oturumu (kayıt dosyası, bu ayın kararları, kabine) ve pencere kanalları
+  game/claude/    Claude beyni: emir okuma, dünyayı oynama, haber yazma; prompt'lar ve cevap şemaları
   ai/             Yapay zeka katmanı: claude -p (abonelik), API anahtarı, sahte sağlayıcı
   store/          SQLite kayıt: anlık görüntüler, olay kaydı, tohumlar
 src/preload/      Arayüz ile ana süreç arasındaki tek, güvenli köprü (window.cs)
 src/renderer/     Arayüz (React): devlet masası, karar kartları, brifing, emir satırı, tur raporu
 src/shared/       İki tarafın ortak kullandığı tipler ve kanal adları
 drizzle/          Kayıt şemasının SQL göçleri (üretilir)
-prompts/          Yapay zeka prompt'ları
 tests/            Testler
-scripts/          Smoke testi, oyun oynatıcı, denge testi, Faz 0.5 kanıtı, göç gömücü ve ikon üretici
+scripts/          Smoke testi, oyun oynatıcılar (kurallı ve gerçek Claude), denge testi, model karşılaştırması, kanıtlar, göç gömücü ve ikon üretici
 build/            Uygulama ikonu
 ```

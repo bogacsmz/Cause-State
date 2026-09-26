@@ -6,7 +6,7 @@ import { AnthropicApiProvider, estimateCostUsd } from '../src/main/ai/anthropic-
 import { resolveClaude } from '../src/main/ai/find-claude'
 import { MockProvider } from '../src/main/ai/mock'
 import { isAbortError } from '../src/main/ai/types'
-import { DEFAULT_API_MODEL, readAiConfig } from '../src/main/config'
+import { DEFAULT_MODEL, readAiConfig } from '../src/main/config'
 
 describe('MockProvider', () => {
   it('streams exactly the text it returns', async () => {
@@ -51,7 +51,7 @@ describe('readAiConfig', () => {
 
 describe('AnthropicApiProvider', () => {
   it('is not ready without an API key', async () => {
-    const status = await new AnthropicApiProvider({ model: DEFAULT_API_MODEL }).status()
+    const status = await new AnthropicApiProvider({ model: DEFAULT_MODEL }).status()
     expect(status).toMatchObject({ provider: 'api', ready: false })
   })
 

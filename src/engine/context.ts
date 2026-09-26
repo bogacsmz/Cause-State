@@ -40,6 +40,8 @@ export interface TurnContextInput {
   firing?: readonly Seed[]
   /** Decisions already committed this month (approved by the referee). */
   decisions?: readonly ProposedChange[]
+  /** Countries the code put in focus this month (they come first, with their world-book entry). */
+  focus?: readonly string[]
 }
 
 /** Countries and provinces the order text talks about. */
@@ -89,7 +91,10 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
   if (!player) throw new Error(`player country ${state.playerCountryId} missing`)
 
   const decisions = input.decisions ?? []
-  const relevant = new Set(relevantEntities(state, input.order, decisions).map(entityKey))
+  const relevant = new Set([
+    ...relevantEntities(state, input.order, decisions).map(entityKey),
+    ...(input.focus ?? []).map((id) => `country:${id}`)
+  ])
 
   const activeEffects = state.effects
     .filter((e) => e.actor === player.id || e.modifiers.some((m) => m.country === player.id))

@@ -210,6 +210,9 @@ export function explainCliFailure(raw: string): string {
   if (/not logged in|please run \/login|log in|authenticat|oauth|invalid api key/i.test(msg)) {
     return 'Claude Code giriş yapılmamış görünüyor. Terminalde `claude` yazıp /login ile giriş yap.'
   }
+  if (/model.*(not found|not available|invalid|does not exist|access)/i.test(msg)) {
+    return 'Bu model aboneliğinde kullanılamıyor. .env dosyasında CS_AI_MODEL=sonnet gibi başka bir model dene.'
+  }
   if (/usage limit|limit reached|rate limit|quota/i.test(msg)) {
     return 'Abonelik kullanım limitine ulaşıldı. Limit sıfırlanınca tekrar dene ya da API anahtarına geç.'
   }

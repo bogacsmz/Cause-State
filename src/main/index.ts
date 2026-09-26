@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, shell } from 'electron'
-import advisorPrompt from '../../prompts/advisor.md?raw'
 import { createProvider } from './ai'
 import { readAiConfig } from './config'
 import { ClaudeBrain, ScriptedBrain } from './game/claude/brain'
@@ -39,7 +38,7 @@ async function start(): Promise<void> {
   const config = readAiConfig(process.env)
   // An empty temp directory: the CLI must not pick up a project's CLAUDE.md or hooks.
   const provider = createProvider(config, { workDir: join(tmpdir(), 'cause-state-claude') })
-  registerAiIpc(provider, advisorPrompt)
+  registerAiIpc(provider)
 
   // Save files live in the user's app data folder. For tests and demos, CS_SAVE_DIR moves
   // them and CS_GAME_SEED / CS_GAME_ID make the first new game reproducible.

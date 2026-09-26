@@ -8,6 +8,7 @@ import { buildTurnRequest } from '../../../engine/context'
 import { entityName, findCountry } from '../../../engine/lookup'
 import { checkDecision, explainIssue, formatIssuesForRepair, type RefereeIssue } from '../../../engine/referee'
 import { resolveTurn, withNarration, type TurnResolution } from '../../../engine/resolve'
+import { spotlight } from '../../../engine/spotlight'
 import { interpretOrder, scriptedChangeList } from '../../../engine/scripted-ai'
 import type { Effort, LlmProvider } from '../../ai/types'
 import { INTERPRET_SYSTEM, NARRATE_SYSTEM, RESOLVE_SYSTEM } from './prompts'
@@ -247,6 +248,8 @@ export class ClaudeBrain implements GameBrain {
     const { state } = input
     const orders = input.orders.join('\n')
     let fallback: string | undefined
+    // The code decides who moves abroad this month; Claude decides what they do.
+    const onStage = spotlight(state, input.decisions)
 
     const makeProposer = (plan: SeedPlan) => {
       let attempt = 0
@@ -259,9 +262,10 @@ export class ClaudeBrain implements GameBrain {
           recentEvents: input.recentEvents,
           candidateSeeds: [...input.dueSeeds, ...input.relevantSeeds],
           firing: plan.firing,
-          decisions: input.decisions
+          decisions: input.decisions,
+          focus: onStage
         })
-        const payload = JSON.stringify({ playing: playing(state), ...request })
+        const payload = JSON.stringify({ playing: playing(state), spotlight: onStage, ...request })
         const prompt = feedback
           ? `${payload}\n\nThe referee rejected your previous answer. Fix every problem and answer again with the complete JSON document.\n${feedback}`
           : payload
@@ -276,8 +280,8 @@ export class ClaudeBrain implements GameBrain {
           foreignIntents: world.data.foreignIntents as ChangeList['foreignIntents'],
           newSeeds: world.data.newSeeds as ChangeList['newSeeds'],
           seedOutcomes: world.data.seedOutcomes as ChangeList['seedOutcomes'],
-          // Placeholder until the newsroom writes the real story from what the code applied.
-          narration: scriptedChangeList(state, { decisions: input.decisions, orders: input.orders, plan }).narration
+          // Placeholder: the newsroom writes the real story once the code has applied the month.
+          narration: { headline: 'Ayın haberi', body: 'Haber, kod ayı uyguladıktan sonra yazılır.' }
         }
         return proposal
       }
@@ -297,15 +301,19 @@ export class ClaudeBrain implements GameBrain {
     if (!resolution.ok) throw new Error('the scripted fallback was rejected too')
 
     hooks.onPhase?.('news')
+    let narration: ReturnType<typeof parseNarration> = null
     try {
-      const narration = await this.narrate(state, resolution.outcome, input.recentEvents, hooks)
-      if (narration) resolution = { ...resolution, outcome: withNarration(resolution.outcome, narration) }
-      else fallback ??= 'Haber metni okunamadı; kurallı yedek anlatım kullanıldı.'
+      narration = await this.narrate(state, resolution.outcome, input.recentEvents, hooks)
+      if (!narration) fallback ??= 'Haber metni okunamadı; kurallı yedek anlatım kullanıldı.'
     } catch (err) {
       fallback ??= `Haber için Claude'a ulaşılamadı (${errorText(err)}); kurallı yedek anlatım kullanıldı.`
-      const { narration } = resolution.outcome
+    }
+    if (!narration) {
+      // The scripted rules write a plain report of the month instead.
+      narration = scriptedChangeList(state, { decisions: input.decisions, orders: input.orders, plan: resolution.plan }).narration
       hooks.onNarration?.(`${narration.headline}\n\n${narration.body}`)
     }
+    resolution = { ...resolution, outcome: withNarration(resolution.outcome, narration) }
     return { resolution, ...(fallback ? { fallback } : {}) }
   }
 
