@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog, session as electronSession, shell } from 'electron'
 import { createProvider } from './ai'
 import { readAiConfig } from './config'
 import { ClaudeBrain, ScriptedBrain } from './game/claude/brain'
@@ -44,6 +44,10 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function start(): Promise<void> {
+  // The game talks to nothing but the AI. Without this, Chromium fetches Hunspell
+  // dictionaries from Google at start (Windows/Linux; macOS uses its own checker).
+  electronSession.defaultSession.setSpellCheckerEnabled(false)
+  electronSession.defaultSession.setSpellCheckerLanguages([])
   loadDevEnv()
   const config = readAiConfig(process.env)
   // An empty temp directory: the CLI must not pick up a project's CLAUDE.md or hooks.
