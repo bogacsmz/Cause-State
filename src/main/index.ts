@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
 import advisorPrompt from '../../prompts/advisor.md?raw'
 import { createProvider } from './ai'
 import { readAiConfig } from './config'
+import { registerGameIpc } from './game/ipc'
+import { GameSession } from './game/session'
 import { registerAiIpc } from './ipc'
 
 const APP_BACKGROUND = '#0b0f13'
@@ -22,15 +24,26 @@ if (!app.requestSingleInstanceLock()) {
       win.focus()
     }
   })
-  void app.whenReady().then(start)
+  void app
+    .whenReady()
+    .then(start)
+    .catch((err: unknown) => {
+      dialog.showErrorBox('Cause & State açılamadı', err instanceof Error ? err.message : String(err))
+      app.quit()
+    })
 }
 
-function start(): void {
+async function start(): Promise<void> {
   loadDevEnv()
   const config = readAiConfig(process.env)
   // An empty temp directory: the CLI must not pick up a project's CLAUDE.md or hooks.
   const provider = createProvider(config, { workDir: join(tmpdir(), 'cause-state-claude') })
   registerAiIpc(provider, advisorPrompt)
+
+  // Save files live in the user's app data folder; CS_SAVE_DIR overrides it (tests, demos).
+  const session = await GameSession.open(process.env.CS_SAVE_DIR ?? join(app.getPath('userData'), 'saves'))
+  registerGameIpc(session)
+  app.on('will-quit', () => session.close())
 
   createWindow()
   app.on('activate', () => {

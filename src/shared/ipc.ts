@@ -1,11 +1,21 @@
 // Contract between the main process and the UI. Both sides import from here,
 // so a channel name or payload shape can only change in one place.
 
+import type { EffectId } from './game/catalog'
+import type { EntityRef } from './game/primitives'
+import type { ActionResult, GameView } from './game/view'
+
 export const IPC = {
   aiStatus: 'ai:status',
   aiAsk: 'ai:ask',
   aiCancel: 'ai:cancel',
-  aiEvent: 'ai:event'
+  aiEvent: 'ai:event',
+  gameView: 'game:view',
+  gameNew: 'game:new',
+  gameCommand: 'game:command',
+  gamePick: 'game:pick',
+  gameUnpick: 'game:unpick',
+  gameEndTurn: 'game:end-turn'
 } as const
 
 /** Which backend answers AI calls: Claude Code CLI (subscription), API key, or offline mock. */
@@ -54,6 +64,17 @@ export interface AskHandlers {
   onError: (message: string) => void
 }
 
+/** The game, run by the main process. Every call returns the fresh view to render. */
+export interface GameBridge {
+  view: () => Promise<GameView>
+  newGame: () => Promise<GameView>
+  /** A typed order: a decision for this turn, or a question for the advisor (free). */
+  command: (text: string) => Promise<ActionResult>
+  pick: (effectId: EffectId, target: EntityRef) => Promise<ActionResult>
+  unpick: (pendingId: string) => Promise<GameView>
+  endTurn: () => Promise<GameView>
+}
+
 /** What the preload script exposes to the UI as `window.cs`. */
 export interface CsBridge {
   platform: string
@@ -62,4 +83,5 @@ export interface CsBridge {
     /** Starts a streamed answer. Returns a function that cancels it. */
     ask: (prompt: string, handlers: AskHandlers) => () => void
   }
+  game: GameBridge
 }

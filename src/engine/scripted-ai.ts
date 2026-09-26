@@ -307,8 +307,11 @@ const ORDER_PATTERNS: ReadonlyArray<{ effectId: EffectId; groups: readonly (read
   { effectId: 'military_buildup', groups: [['ordu', 'silahlan', 'yığınak', 'seferber', 'savunma bütçe', 'asker']] }
 ]
 
-/** Turns a typed order into one catalog decision, or into free advice. Never spends capital itself. */
-export function interpretOrder(state: GameState, text: string): Interpretation {
+/**
+ * Turns a typed order into one catalog decision, or into free advice. Never spends capital
+ * itself. `pending` = decisions already picked this turn, so the answer accounts for them.
+ */
+export function interpretOrder(state: GameState, text: string, pending: readonly Decision[] = []): Interpretation {
   const haystack = ` ${text.toLocaleLowerCase('tr')} `
   const match = ORDER_PATTERNS.find((p) => p.groups.every((group) => group.some((w) => containsWord(haystack, w))))
   if (!match) return { kind: 'talk', reply: adviceFor(state, haystack) }
@@ -331,7 +334,7 @@ export function interpretOrder(state: GameState, text: string): Interpretation {
     target = countryRef(player)
   }
 
-  const issues = checkDecision(state, match.effectId, target)
+  const issues = checkDecision(state, match.effectId, target, pending)
   if (issues.length > 0) {
     return { kind: 'talk', reply: `Emrini "${def.label}" olarak anladım ama şu an olmaz: ${explainIssue(issues[0]!)}` }
   }

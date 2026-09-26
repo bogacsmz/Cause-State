@@ -26,7 +26,7 @@ export function createNewGame(opts: NewGameOptions): GameState {
     playerCountryId: player,
     status: 'playing',
     ending: null,
-    election: { nextTurn: ELECTION_EVERY_TURNS, everyTurns: ELECTION_EVERY_TURNS, threshold: ELECTION_THRESHOLD, last: null },
+    election: { nextTurn: ELECTION_EVERY_TURNS, everyTurns: ELECTION_EVERY_TURNS, threshold: ELECTION_THRESHOLD, last: null, won: 0 },
     politicalCapital: { current: CAPITAL_PER_TURN, perTurn: CAPITAL_PER_TURN, max: CAPITAL_PER_TURN },
     countries: START_COUNTRIES.map((c) => ({
       ...c,

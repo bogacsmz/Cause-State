@@ -240,6 +240,7 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
     })
     if (won) {
       next.election.nextTurn = next.turn + next.election.everyTurns
+      next.election.won += 1
       me.nextElection = addMonths(next.date, next.election.everyTurns * MONTHS_PER_TURN)
       bump('approval', ELECTION_WIN_BONUS, 'Seçim zaferi')
     } else {

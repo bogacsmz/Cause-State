@@ -191,7 +191,9 @@ export const GameState = z
       everyTurns: z.int().min(1),
       /** Vote share needed to stay in power. */
       threshold: z.int().min(1).max(100),
-      last: z.strictObject({ turn: Turn, vote: z.int(), won: z.boolean() }).nullable()
+      last: z.strictObject({ turn: Turn, vote: z.int(), won: z.boolean() }).nullable(),
+      /** Elections won so far. */
+      won: z.int().min(0)
     }),
     politicalCapital: z.strictObject({
       current: z.int().min(0),

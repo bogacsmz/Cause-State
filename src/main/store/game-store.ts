@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL } from 'drizzle-orm'
 import type { TurnOutcome } from '@shared/game/contract'
-import type { EntityRef } from '@shared/game/primitives'
+import type { BarId, EntityRef } from '@shared/game/primitives'
 import { GameEvent, GameState, Seed } from '@shared/game/schema'
 import { openDatabase, type Db } from './database'
 import { eventEntities, events, eventTags, seedEntities, seeds, seedTags, snapshots } from './tables'
@@ -86,6 +86,16 @@ export class GameStore {
     if (ids.length === 0) return []
     const rows = await this.db.select({ body: seeds.body }).from(seeds).where(inArray(seeds.id, [...ids])).all()
     return rows.map((r) => Seed.parse(JSON.parse(r.body)))
+  }
+
+  /** One bar of one country at every saved turn, oldest first: the poll chart. */
+  async barHistory(countryId: string, bar: BarId): Promise<Array<{ turn: number; value: number }>> {
+    const rows = await this.db.select({ turn: snapshots.turn, body: snapshots.body }).from(snapshots).orderBy(asc(snapshots.turn)).all()
+    return rows.flatMap((r) => {
+      // Bodies were validated on the way in; a chart does not need to validate them again.
+      const country = (JSON.parse(r.body) as GameState).countries.find((c) => c.id === countryId)
+      return country ? [{ turn: r.turn, value: country.bars[bar] }] : []
+    })
   }
 
   /** Newest first. Hidden events (e.g. planted seeds) are left out unless asked for. */
