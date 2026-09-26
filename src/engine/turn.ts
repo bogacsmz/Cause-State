@@ -2,6 +2,7 @@ import { EFFECTS, type EffectId } from '@shared/game/catalog'
 import type { TurnAction, TurnOutcome } from '@shared/game/contract'
 import { BAR_IDS, countryRef, entityKey, type Bars, type EntityRef } from '@shared/game/primitives'
 import type { ActiveEffect, BarChange, GameEvent, GameState, Seed, TurnReport } from '@shared/game/schema'
+import { ek } from '@shared/tr'
 import { clamp, coupChance, tickBars } from './dynamics'
 import { entityName, findCountry, owningCountry } from './lookup'
 import { createRng } from './rng'
@@ -78,8 +79,10 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
       visibility: 'public',
       title: truncate(
         a.seed
-          ? `${a.seed.sourceEffectId ? 'Kelebek etkisi' : 'Dünya gündemi'}: ${def.label}`
-          : `${def.label}: ${entityName(next, a.target)}`,
+          ? `${a.seed.sourceEffectId ? 'Kelebek etkisi' : 'Dünya gündemi'}: ${def.label}${a.actor === player ? '' : ` · ${entityName(next, countryRef(a.actor))}`}`
+          : owningCountry(next, a.target) === a.actor && a.target.type === 'country'
+            ? def.label
+            : `${def.label}: ${entityName(next, a.target)}`,
         160
       ),
       summary: a.reason,
@@ -195,8 +198,10 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
   next.effects = next.effects.filter((e) => {
     if (e.expiresTurn === null || next.turn + 1 < e.expiresTurn) return true
     const touchesPlayer = e.actor === player || e.modifiers.some((m) => m.country === player)
-    if (touchesPlayer) {
-      const label = EFFECTS[e.effectId].label
+    // One-turn effects (a protest note) start and end in the same turn; no need to announce the end.
+    if (touchesPlayer && e.appliedTurn < next.turn) {
+      const other = e.actor !== player ? countryRef(e.actor) : owningCountry(next, e.target) !== player ? e.target : null
+      const label = other ? `${EFFECTS[e.effectId].label}: ${entityName(next, other)}` : EFFECTS[e.effectId].label
       expired.push(label)
       record({
         kind: 'effect_expired',
@@ -230,7 +235,7 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
     record({
       kind: 'election',
       visibility: 'public',
-      title: won ? `Seçim kazanıldı: oyların %${vote}'i` : `Seçim kaybedildi: oyların %${vote}'i`,
+      title: won ? `Seçim kazanıldı: oyların %${ek(vote, 'i')}` : `Seçim kaybedildi: oyların %${ek(vote, 'i')}`,
       summary: won
         ? `Halk bir dönem daha güven verdi. Bir sonraki seçim ${next.election.everyTurns} tur sonra.`
         : `Gereken %${next.election.threshold} barajına ulaşılamadı. İktidar el değiştiriyor.`,
@@ -266,7 +271,7 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
         kind: 'coup',
         turn: next.turn,
         title: 'Darbe',
-        detail: `İstikrar ${me.bars.stability}'e düştü ve ordu yönetime el koydu.`
+        detail: `İstikrar ${ek(me.bars.stability, 'e')} düştü ve ordu yönetime el koydu.`
       }
       record({
         kind: 'coup',

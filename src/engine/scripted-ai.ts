@@ -1,10 +1,12 @@
 import { EFFECTS, type EffectId } from '@shared/game/catalog'
 import type { ChangeList, ForeignIntent, SeedOutcome, SeedPlan, SeedProposal } from '@shared/game/contract'
-import { countryRef, entityKey, type EntityRef } from '@shared/game/primitives'
+import { countryRef, entityKey, type Bars, type EntityRef } from '@shared/game/primitives'
 import type { GameState, Seed } from '@shared/game/schema'
 import { mentionedEntities } from './context'
 import { entityName, findCountry, owningCountry } from './lookup'
 import { checkDecision, explainIssue } from './referee'
+import { ek } from '@shared/tr'
+import { coupChance, DYNAMICS } from './dynamics'
 import { hashRoll } from './rng'
 
 // Phase 1's stand-in for the LLM. It speaks the exact same contract (a ChangeList the
@@ -44,7 +46,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'budget_gap',
       hook: ({ turn }) => `Tur ${turn}: vergi indirimi kasada delik açıyor. Bütçe bir gün bunun hesabını soracak.`,
       headline: 'Hazinede alarm: bütçe açığı büyüdü',
-      body: ({ planted }) => `Tur ${planted}'deki vergi indiriminin faturası geldi. Hazine harcamaları kısmak zorunda kaldı.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki vergi indiriminin faturası geldi. Hazine harcamaları kısmak zorunda kaldı.`
     }
   ],
   fiscal_stimulus: [
@@ -56,7 +58,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'inflation_spike',
       hook: ({ turn }) => `Tur ${turn}: teşvik paketiyle piyasaya para pompalandı. Fiyatlar er geç tepki verecek.`,
       headline: 'Fiyatlar uçtu: enflasyon sıçradı',
-      body: ({ planted }) => `Tur ${planted}'de piyasaya pompalanan para mutfağa ulaştı. Market fiyatları haftalar içinde tırmandı.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')} piyasaya pompalanan para mutfağa ulaştı. Market fiyatları haftalar içinde tırmandı.`
     }
   ],
   austerity: [
@@ -68,7 +70,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'investor_confidence',
       hook: ({ turn }) => `Tur ${turn}: kemer sıkma piyasalara disiplin mesajı verdi. Yatırımcılar bunu hatırlayabilir.`,
       headline: 'Piyasalar disiplini ödüllendirdi',
-      body: ({ planted }) => `Tur ${planted}'de başlayan kemer sıkma meyvesini verdi. Yabancı sermaye yeniden ülkeye yöneldi.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')} başlayan kemer sıkma meyvesini verdi. Yabancı sermaye yeniden ülkeye yöneldi.`
     }
   ],
   regional_investment: [
@@ -80,7 +82,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'regional_boom',
       hook: ({ turn, target }) => `Tur ${turn}: ${target} için başlatılan yatırım bölgede umut yarattı.`,
       headline: 'Bölgesel yatırım meyvesini verdi',
-      body: ({ planted, target }) => `Tur ${planted}'de ${target} için başlatılan projeler tamamlandı. Yeni işler ve yollar bölgeyi canlandırdı.`
+      body: ({ planted, target }) => `Tur ${ek(planted, 'de')} ${target} için başlatılan projeler tamamlandı. Yeni işler ve yollar bölgeyi canlandırdı.`
     }
   ],
   anti_corruption_drive: [
@@ -92,7 +94,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'elite_backlash',
       hook: ({ turn }) => `Tur ${turn}: yolsuzluk operasyonunda koltuk kaybedenler intikam için fırsat kolluyor.`,
       headline: 'Eski düzen karşı hamleye geçti',
-      body: ({ planted }) => `Tur ${planted}'deki operasyonda tasfiye edilenler medyada ve mahkemelerde hükümete karşı cephe açtı.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki operasyonda tasfiye edilenler medyada ve mahkemelerde hükümete karşı cephe açtı.`
     }
   ],
   press_crackdown: [
@@ -104,7 +106,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'protest_wave',
       hook: ({ turn }) => `Tur ${turn}: basına uygulanan baskı sessiz bir öfke biriktiriyor. Bir gün sokaklara taşabilir.`,
       headline: 'Susturulan öfke sokaklara taştı',
-      body: ({ planted }) => `Tur ${planted}'de basına uyguladığın baskı unutulmadı. Biriken öfke bugün büyük meydanlarda patladı.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')} basına uyguladığın baskı unutulmadı. Biriken öfke bugün büyük meydanlarda patladı.`
     }
   ],
   eu_accession_bid: [
@@ -116,7 +118,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'eu_process_frozen',
       hook: ({ turn }) => `Tur ${turn}: AB başvurusu Paris'te soğuk karşılandı. Fransa süreci bir zirvede durdurmaya çalışabilir.`,
       headline: 'Paris vetoyu çekti: AB süreci donduruldu',
-      body: ({ planted }) => `Tur ${planted}'deki AB başvurusu Brüksel zirvesinde Fransa'nın veto tehdidine takıldı. Süreç en az altı ay donduruldu.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki AB başvurusu Brüksel zirvesinde Fransa'nın veto tehdidine takıldı. Süreç en az altı ay donduruldu.`
     }
   ],
   eu_membership: [
@@ -128,7 +130,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'nationalist_backlash',
       hook: ({ turn }) => `Tur ${turn}: AB üyeliğiyle egemenlik kaybına öfkelenen kesimler örgütleniyor.`,
       headline: 'Egemenlik mitingleri: milliyetçi tepki büyüdü',
-      body: ({ planted }) => `Tur ${planted}'deki AB üyeliği sonrası "egemenlik elden gidiyor" diyenler meydanları doldurdu.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki AB üyeliği sonrası "egemenlik elden gidiyor" diyenler meydanları doldurdu.`
     },
     {
       key: 'ab-fonlari',
@@ -138,7 +140,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'eu_funds',
       hook: ({ turn }) => `Tur ${turn}: AB üyeliğiyle birlikte uyum fonlarının yolu açıldı.`,
       headline: 'AB fonları akmaya başladı',
-      body: ({ planted }) => `Tur ${planted}'deki üyeliğin ilk somut meyvesi: Berlin'in öncülüğünde uyum fonları serbest bırakıldı.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki üyeliğin ilk somut meyvesi: Berlin'in öncülüğünde uyum fonları serbest bırakıldı.`
     }
   ],
   trade_agreement: [
@@ -150,7 +152,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'foreign_investment',
       hook: ({ turn, target }) => `Tur ${turn}: ${target} ile ticaret anlaşması imzalandı. Karşı tarafın şirketleri fırsat kolluyor.`,
       headline: 'Ticaret anlaşması yatırım getirdi',
-      body: ({ planted, target }) => `Tur ${planted}'de ${target} ile imzalanan anlaşma meyvesini verdi. Şirketleri yeni fabrikalar için harekete geçti.`
+      body: ({ planted, target }) => `Tur ${ek(planted, 'de')} ${target} ile imzalanan anlaşma meyvesini verdi. Şirketleri yeni fabrikalar için harekete geçti.`
     }
   ],
   sanctions: [
@@ -160,9 +162,9 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       likelihood: 'likely',
       actor: 'target',
       outcome: 'sanctions',
-      hook: ({ turn, target }) => `Tur ${turn}: ${target}'a yaptırım uygulandı. Karşılık vermek için zamanını bekliyor.`,
+      hook: ({ turn, target }) => `Tur ${turn}: yaptırım kararıyla hedef alınan ${target}, karşılık vermek için zamanını bekliyor.`,
       headline: 'Karşı yaptırım geldi',
-      body: ({ planted, target }) => `Tur ${planted}'de ${target}'a uyguladığın yaptırıma aynı sertlikte karşılık verildi.`
+      body: ({ planted, target }) => `Tur ${ek(planted, 'de')} uyguladığın yaptırıma ${target} aynı sertlikte karşılık verdi.`
     }
   ],
   military_aid: [
@@ -172,9 +174,9 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       likelihood: 'possible',
       actor: 'target',
       outcome: 'trade_agreement',
-      hook: ({ turn, target }) => `Tur ${turn}: ${target}'a askerî yardım gönderildi. Bu iyilik unutulmayabilir.`,
+      hook: ({ turn, target }) => `Tur ${turn}: askerî yardım gönderilen ${target} bu iyiliği unutmayabilir.`,
       headline: 'Eski dost vefasını gösterdi',
-      body: ({ planted, target }) => `Tur ${planted}'de gönderdiğin askerî yardımı unutmayan ${target}, sana ayrıcalıklı bir ticaret anlaşması önerdi.`
+      body: ({ planted, target }) => `Tur ${ek(planted, 'de')} gönderdiğin askerî yardımı unutmayan ${target}, sana ayrıcalıklı bir ticaret anlaşması önerdi.`
     }
   ],
   military_buildup: [
@@ -186,7 +188,7 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
       outcome: 'regional_tension',
       hook: ({ turn }) => `Tur ${turn}: askerî yığınak komşuları tedirgin etti. Bölgede silahlanma yarışı başlayabilir.`,
       headline: "Ege'de gerilim tırmandı",
-      body: ({ planted }) => `Tur ${planted}'deki askerî yığınağa komşular kendi hazırlıklarıyla karşılık verdi. Sınırda gerilim yükseldi.`
+      body: ({ planted }) => `Tur ${ek(planted, 'de')}ki askerî yığınağa komşular kendi hazırlıklarıyla karşılık verdi. Sınırda gerilim yükseldi.`
     }
   ]
 }
@@ -196,8 +198,9 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
  * it shows up in the news first (the foreshadowing), and the code decides if and when it hits.
  */
 interface WorldScript extends SeedScript {
-  /** The line in this turn's news that hints at it. */
+  /** The line in this turn's news that hints at it, and a headline for a quiet month. */
   foreshadow: string
+  teaser: string
 }
 
 /** Chance per turn that a new world development starts brewing. */
@@ -206,6 +209,7 @@ export const WORLD_EVENT_CHANCE = 0.3
 const WORLD_SCRIPTS: readonly WorldScript[] = [
   {
     key: 'rus-gazi',
+    teaser: "Moskova'dan doğalgaz sinyali",
     dormancy: 'medium',
     likelihood: 'possible',
     actor: 'RUS',
@@ -213,10 +217,11 @@ const WORLD_SCRIPTS: readonly WorldScript[] = [
     foreshadow: 'Dünya gündemi: Moskova doğalgaz fiyatları için yeni pazarlık istiyor, sert sinyaller veriyor.',
     hook: () => 'Rusya doğalgaz anlaşmasını yeniden masaya yatırmak istiyor; vanayı kısmakla tehdit ediyor.',
     headline: 'Moskova vanayı kıstı',
-    body: ({ planted }) => `Tur ${planted}'de gelen sinyaller doğru çıktı: Rusya doğalgaz akışını kıstı. Fabrikalar ve evler zor günlere hazırlanıyor.`
+    body: ({ planted }) => `Tur ${ek(planted, 'de')} gelen sinyaller doğru çıktı: Rusya doğalgaz akışını kıstı. Fabrikalar ve evler zor günlere hazırlanıyor.`
   },
   {
     key: 'emtia',
+    teaser: "Küresel fiyatlar tırmanıyor",
     dormancy: 'medium',
     likelihood: 'possible',
     actor: 'world',
@@ -224,10 +229,11 @@ const WORLD_SCRIPTS: readonly WorldScript[] = [
     foreshadow: 'Dünya gündemi: küresel emtia fiyatları tırmanıyor, ithalat faturası kabarıyor.',
     hook: () => 'Küresel emtia fiyatları tırmanıyor; ithalat faturası er geç rafları vuracak.',
     headline: 'İthal enflasyon kapıda',
-    body: ({ planted }) => `Tur ${planted}'de başlayan küresel fiyat artışı sonunda raflara yansıdı. Market fişleri kabardı.`
+    body: ({ planted }) => `Tur ${ek(planted, 'de')} başlayan küresel fiyat artışı sonunda raflara yansıdı. Market fişleri kabardı.`
   },
   {
     key: 'turizm',
+    teaser: "Alman turizmcilerin gözü Ege'de",
     dormancy: 'medium',
     likelihood: 'possible',
     actor: 'DEU',
@@ -235,10 +241,11 @@ const WORLD_SCRIPTS: readonly WorldScript[] = [
     foreshadow: "Dünya gündemi: Alman turizm şirketleri Ege kıyılarında yatırım fırsatı arıyor.",
     hook: () => "Alman turizm şirketleri Ege'de yatırım fırsatı kolluyor.",
     headline: "Alman sermayesi Ege'de",
-    body: ({ planted }) => `Tur ${planted}'de konuşulan turizm yatırımları gerçek oldu. Alman şirketleri yeni oteller için imzayı attı.`
+    body: ({ planted }) => `Tur ${ek(planted, 'de')} konuşulan turizm yatırımları gerçek oldu. Alman şirketleri yeni oteller için imzayı attı.`
   },
   {
     key: 'sinir-otesi',
+    teaser: "Sınır ötesinde çatışma",
     dormancy: 'short',
     likelihood: 'possible',
     actor: 'world',
@@ -246,10 +253,11 @@ const WORLD_SCRIPTS: readonly WorldScript[] = [
     foreshadow: 'Dünya gündemi: sınır ötesinde çatışmalar tırmanıyor, göç dalgası endişesi büyüyor.',
     hook: () => 'Sınır ötesinde çatışmalar tırmanıyor; kıvılcım sınırın bu yanına sıçrayabilir.',
     headline: 'Sınırda tansiyon yükseldi',
-    body: ({ planted }) => `Tur ${planted}'den beri süren sınır ötesi çatışmalar sonunda bu yakaya taştı. Güvenlik alarmı verildi.`
+    body: ({ planted }) => `Tur ${ek(planted, 'den')} beri süren sınır ötesi çatışmalar sonunda bu yakaya taştı. Güvenlik alarmı verildi.`
   },
   {
     key: 'abd-ticaret',
+    teaser: "Washington'dan ticaret sinyali",
     dormancy: 'medium',
     likelihood: 'possible',
     actor: 'USA',
@@ -257,7 +265,7 @@ const WORLD_SCRIPTS: readonly WorldScript[] = [
     foreshadow: 'Dünya gündemi: Washington bölgede yeni ticaret ortakları arıyor.',
     hook: () => 'Washington bölgede yeni ticaret ortakları arıyor; Ankara listede.',
     headline: 'Washington kapıyı açtı',
-    body: ({ planted }) => `Tur ${planted}'de konuşulmaya başlanan ticaret çerçevesi imzalandı. ABD pazarı Türk ürünlerine açılıyor.`
+    body: ({ planted }) => `Tur ${ek(planted, 'de')} konuşulmaya başlanan ticaret çerçevesi imzalandı. ABD pazarı Türk ürünlerine açılıyor.`
   }
 ]
 
@@ -352,18 +360,34 @@ function adviceFor(state: GameState, haystack: string): string {
   if (!me) return 'Emrinizi anlayamadım.'
   const turnsLeft = Math.max(0, state.election.nextTurn - state.turn)
   const status = `Anketler %${me.bars.approval} gösteriyor. Seçime ${turnsLeft} ay kaldı, baraj %${state.election.threshold}.`
-  const weakest = (['economy', 'welfare', 'stability'] as const).reduce((a, b) => (me.bars[a] <= me.bars[b] ? a : b))
-  const hint = {
-    economy: 'En zayıf halkamız ekonomi. Teşvik ya da ticaret anlaşması düşünebilirsiniz, ama bedelleri var.',
-    welfare: 'Halkın cebi zayıf. Refah artmadan onay kalıcı olarak yükselmez.',
-    stability: 'İstikrar zayıflıyor. Kışlalardaki sesleri hafife almayın.'
-  }[weakest]
+  const hint = adviceHint(state, me.bars, turnsLeft)
   const asking = /\?|durum|rapor|öneri|ne yap|tavsiye|anket|nasıl/.test(haystack)
   if (asking) return `${status} ${hint}`
   return (
     'Bu emri elimizdeki kararlardan birine çeviremedim. Örnekler: "vergileri indir", "Yunanistan ile ticaret anlaşması yap", ' +
     `"AB'ye başvur", "İzmir'e yatırım yap". ${status}`
   )
+}
+
+/** The one thing the advisor would say right now, most urgent first. */
+function adviceHint(state: GameState, bars: Bars, turnsLeft: number): string {
+  const risk = coupChance(bars.stability)
+  const margin = bars.approval - state.election.threshold
+  if (risk > 0) {
+    return `Kışlalar huzursuz: darbe riski %${Math.round(risk * 100)}. İstikrarı ${DYNAMICS.coupThreshold} üstüne çıkarmadan başka hiçbir şey önemli değil.`
+  }
+  if (turnsLeft <= 3 && margin < 3) {
+    return 'Sandık kapıda. Halkı hemen memnun eden adımlar şimdi işe yarar; faturası seçimden sonra gelir.'
+  }
+  if (turnsLeft <= 3) return 'Sandık kapıda ve öndeyiz. Riskli adımları seçimden sonraya bırakmak akıllıca olur.'
+  if (bars.stability < 45) return 'İstikrar zayıflıyor. Kışlalardaki sesleri hafife almayın.'
+  if (turnsLeft >= 9 && margin < 5) {
+    return 'Seçime daha zaman var. Acı ama uzun vadede kazandıran adımlar için en uygun dönem bu; halk unutur, ekonomi hatırlar.'
+  }
+  if (bars.economy < 40) return 'En zayıf halkamız ekonomi. Ticaret ve yatırım düşünebilirsiniz; teşvik hızlıdır ama bedeli ağırdır.'
+  if (bars.welfare < bars.economy - 5) return 'Ekonomi büyüyor ama halkın cebine yansımadı. Refah artmadan onay kalıcı olarak yükselmez.'
+  if (margin >= 5) return 'Durum iyi. Kazanılmış güveni harcamadan, seçime kadar dengeyi korumak yeter.'
+  return 'Halkın cebi zayıf. Refah artmadan onay kalıcı olarak yükselmez.'
 }
 
 function containsWord(haystack: string, word: string): boolean {
@@ -418,6 +442,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   const newSeeds: SeedProposal[] = []
   // The world first: a development abroad that may hit later.
   const worldLines: string[] = []
+  let worldTeaser: string | undefined
   if (hashRoll(`${state.gameId}|world|${turn}`) < WORLD_EVENT_CHANCE) {
     const script = WORLD_SCRIPTS[Math.floor(hashRoll(`${state.gameId}|world-pick|${turn}`) * WORLD_SCRIPTS.length)]!
     const actorRef = script.actor === 'world' ? null : countryRef(script.actor)
@@ -431,6 +456,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
       condition: null
     })
     worldLines.push(script.foreshadow)
+    worldTeaser = script.teaser
   }
   for (const d of input.decisions) {
     for (const script of SEED_SCRIPTS[d.effectId] ?? []) {
@@ -450,23 +476,21 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   }
 
   const seedOutcomes: SeedOutcome[] = []
-  const seedLines: string[] = []
   const seedHeadlines: string[] = []
   const used = new Set<string>()
   for (const seed of input.plan.firing) {
-    const { outcome, line, headline } = resolveSeed(state, seed, used)
+    const { outcome, headline } = resolveSeed(state, seed, used)
     seedOutcomes.push(outcome)
-    seedLines.push(line)
     if (headline) seedHeadlines.push(headline)
   }
 
   const turnsLeft = state.election.nextTurn - turn
   const decisionLabels = input.decisions.map((d) => EFFECTS[d.effectId].label.toLocaleLowerCase('tr'))
+  // Fired seeds have their own card in the news; the narration only leads with their headline.
   const body = [
-    ...seedLines,
     decisionLabels.length > 0
       ? `Hükümet bu ay şu adımları attı: ${decisionLabels.join(', ')}.`
-      : 'Ankara bu ay yeni bir adım atmadı; gözler anketlerde.',
+      : quietLine(state),
     ...reactionLines,
     ...worldLines,
     turnsLeft > 0 && turnsLeft <= 3 ? `Seçime ${turnsLeft} ay kaldı.` : ''
@@ -476,7 +500,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
 
   const firstDecision = input.decisions[0]
   const headline =
-    seedHeadlines[0] ?? (firstDecision ? HEADLINES[firstDecision.effectId] : undefined) ?? 'Sessiz bir ay'
+    seedHeadlines[0] ?? (firstDecision ? HEADLINES[firstDecision.effectId] : undefined) ?? worldTeaser ?? quietHeadline(state, turn)
 
   return {
     interpretation:
@@ -493,16 +517,39 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   }
 }
 
+/** A month without decisions still has news: where the polls stand, what is still running. */
+function quietHeadline(state: GameState, turn: number): string {
+  const me = findCountry(state, state.playerCountryId)
+  const turnsLeft = state.election.nextTurn - turn
+  if (me && turnsLeft > 0 && turnsLeft <= 3) return `Seçime ${turnsLeft} ay: kulisler hareketli`
+  if (me && me.bars.approval >= state.election.threshold + 5) return 'Anketlerde iktidar rahat'
+  if (me && me.bars.approval < state.election.threshold - 10) return 'Muhalefet anketlerde açık ara önde'
+  if (me && me.bars.approval < state.election.threshold - 3) return 'Muhalefet anketlerde önde'
+  const pool = ["Ankara'da sakin bir ay", 'Gözler anketlerde', 'Hükümet bekle-gör modunda', 'Kulislerde sessizlik']
+  return pool[Math.floor(hashRoll(`${state.gameId}|quiet|${turn}`) * pool.length)]!
+}
+
+function quietLine(state: GameState): string {
+  const me = findCountry(state, state.playerCountryId)
+  const running = state.effects.filter((e) => e.actor === state.playerCountryId && e.source === 'player').length
+  return [
+    'Ankara bu ay yeni bir adım atmadı.',
+    running > 0 ? 'Daha önce alınan kararların etkisi sürüyor.' : '',
+    me ? `Son ankette iktidar %${me.bars.approval}.` : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
 function resolveSeed(
   state: GameState,
   seed: Seed,
   used: Set<string>
-): { outcome: SeedOutcome; line: string; headline?: string } {
+): { outcome: SeedOutcome; headline?: string } {
   const player = state.playerCountryId
   const script = SCRIPTS_BY_KEY.get(seed.tags[0] ?? '')
-  const storyOnly = (reason: string): { outcome: SeedOutcome; line: string } => ({
-    outcome: { seedId: seed.id, actor: null, effectId: null, target: null, reason },
-    line: reason
+  const storyOnly = (reason: string): { outcome: SeedOutcome } => ({
+    outcome: { seedId: seed.id, actor: null, effectId: null, target: null, reason }
   })
   if (!script) return storyOnly(`Geçmişten bir yankı: ${seed.hook}`)
 
@@ -528,7 +575,6 @@ function resolveSeed(
   used.add(`${script.outcome}|${effectActor}`)
   return {
     outcome: { seedId: seed.id, actor: actorId, effectId: script.outcome, target, reason: body },
-    line: body,
     headline: script.headline
   }
 }

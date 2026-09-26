@@ -40,8 +40,12 @@ async function start(): Promise<void> {
   const provider = createProvider(config, { workDir: join(tmpdir(), 'cause-state-claude') })
   registerAiIpc(provider, advisorPrompt)
 
-  // Save files live in the user's app data folder; CS_SAVE_DIR overrides it (tests, demos).
-  const session = await GameSession.open(process.env.CS_SAVE_DIR ?? join(app.getPath('userData'), 'saves'))
+  // Save files live in the user's app data folder. For tests and demos, CS_SAVE_DIR moves
+  // them and CS_GAME_SEED / CS_GAME_ID make the first new game reproducible.
+  const session = await GameSession.open(process.env.CS_SAVE_DIR ?? join(app.getPath('userData'), 'saves'), {
+    ...(process.env.CS_GAME_SEED ? { seed: Number(process.env.CS_GAME_SEED) } : {}),
+    ...(process.env.CS_GAME_ID ? { gameId: process.env.CS_GAME_ID } : {})
+  })
   registerGameIpc(session)
   app.on('will-quit', () => session.close())
 

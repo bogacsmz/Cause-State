@@ -1,5 +1,5 @@
 import { CATEGORY_LABELS, EFFECTS, PLAYER_EFFECT_IDS, type EffectDef } from '@shared/game/catalog'
-import { BAR_IDS, BAR_LABELS, countryRef, type EntityRef } from '@shared/game/primitives'
+import { BAR_LABELS, countryRef, type BarId, type EntityRef } from '@shared/game/primitives'
 import type { GameEvent, GameState, Seed } from '@shared/game/schema'
 import type {
   ActiveEffectView,
@@ -16,6 +16,9 @@ import { entityName, findCountry } from './lookup'
 import { checkDecision, explainIssue } from './referee'
 import type { Decision } from './scripted-ai'
 import { seedOrigin } from './turn'
+
+/** The order bars appear in on screen: what decides elections first. */
+const DESK_ORDER: readonly BarId[] = ['approval', 'stability', 'economy', 'welfare', 'military', 'sovereignty', 'reputation']
 
 /** Human lines for an effect's numbers, e.g. "Onay +5", "Ekonomi +2/tur", "4 tur". */
 export function effectLines(def: EffectDef): string[] {
@@ -95,7 +98,7 @@ export function buildView({ state, feed, seeds, pending = [], chat = [], polls =
   const seedById = new Map(seeds.map((s) => [s.id, s]))
 
   const report = state.lastReport
-  const bars: BarView[] = BAR_IDS.map((id) => {
+  const bars: BarView[] = DESK_ORDER.map((id) => {
     const change = report?.bars.find((b) => b.bar === id)
     return {
       id,

@@ -124,7 +124,6 @@ describe('applyTurn', () => {
       'effect_applied',
       'foreign_action',
       'seed_planted',
-      'effect_expired',
       'narration'
     ])
     expect(events.find((e) => e.kind === 'seed_planted')?.visibility).toBe('hidden')

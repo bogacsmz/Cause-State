@@ -1,82 +1,101 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import type { AiStatus } from '@shared/ipc'
+import type { GameView } from '@shared/game/view'
+import type { Notice } from '../lib/useGame'
 
 interface Props {
-  status: AiStatus | null
+  view: GameView
   busy: boolean
-  onSend: (order: string) => void
-  onCancel: () => void
+  notice: Notice | null
+  onCommand: (text: string) => Promise<boolean>
+  onUnpick: (id: string) => void
+  onEndTurn: () => void
 }
 
-export function CommandBar({ status, busy, onSend, onCancel }: Props): React.JSX.Element {
+export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn }: Props): React.JSX.Element {
   const [order, setOrder] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const ready = status?.ready === true
-  const canSend = ready && !busy && order.trim().length > 0
+  const playing = view.status === 'playing'
+  const canSend = playing && !busy && order.trim().length > 0
 
   useEffect(() => {
-    if (ready) inputRef.current?.focus()
-  }, [ready])
+    if (playing) inputRef.current?.focus()
+  }, [playing])
 
-  useEffect(() => {
-    if (!busy) return
-    const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onCancel])
-
-  const submit = (e?: FormEvent): void => {
+  const submit = async (e?: FormEvent): Promise<void> => {
     e?.preventDefault()
     if (!canSend) return
-    onSend(order.trim())
-    setOrder('')
+    if (await onCommand(order.trim())) setOrder('')
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      if (playing && !busy) onEndTurn()
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      submit()
+      void submit()
     }
   }
 
+  const { left, max } = view.player.capital
+
   return (
-    <form className="command" onSubmit={submit}>
-      {status && !status.ready && (
-        <p className="command__notice" role="status">
-          {status.label}: {status.detail}
+    <form className="command" onSubmit={(e) => void submit(e)}>
+      <div className="command__plan">
+        <span className="eyebrow">Bu ay</span>
+        {view.pending.length === 0 ? (
+          <span className="command__empty">Henüz karar yok. Kart seç ya da emir yaz; hiçbir şey yapmamak da bir karardır.</span>
+        ) : (
+          <ul className="pending">
+            {view.pending.map((p) => (
+              <li key={p.id} className="pending__item" title={p.order ?? undefined}>
+                <span>
+                  {p.label}
+                  {p.targetName && <em> · {p.targetName}</em>}
+                </span>
+                <button type="button" className="pending__drop" onClick={() => onUnpick(p.id)} disabled={busy} aria-label={`${p.label} kararını geri al`}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <span className="command__capital">
+          {left}/{max} sermaye kaldı
+        </span>
+      </div>
+
+      {notice && (
+        <p key={notice.id} className={`command__notice command__notice--${notice.tone}`} role="status">
+          {notice.text}
         </p>
       )}
 
-      <label className="command__label" htmlFor="order">
-        Emir
-      </label>
-
-      <textarea
-        id="order"
-        ref={inputRef}
-        className="command__input"
-        rows={1}
-        value={order}
-        onChange={(e) => setOrder(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="Bakanlığa, orduya ya da danışmana bir emir yaz…"
-        disabled={!ready}
-        spellCheck={false}
-      />
-
-      <div className="command__actions">
-        {busy ? (
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
-            Durdur <kbd>Esc</kbd>
-          </button>
-        ) : (
-          <button type="submit" className="btn btn--primary" disabled={!canSend}>
-            Gönder
-          </button>
-        )}
-        <span className="command__hint">Enter gönder · Shift+Enter yeni satır</span>
+      <div className="command__row">
+        <label className="command__label" htmlFor="order">
+          Emir
+        </label>
+        <textarea
+          id="order"
+          ref={inputRef}
+          className="command__input"
+          rows={1}
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={'Bir emir ver ("vergileri indir", "Yunanistan ile ticaret anlaşması yap") ya da danışmana sor…'}
+          disabled={!playing}
+          spellCheck={false}
+        />
+        <button type="submit" className="btn btn--ghost" disabled={!canSend}>
+          Gönder
+        </button>
+        <button type="button" className="btn btn--primary btn--turn" onClick={onEndTurn} disabled={!playing || busy}>
+          {busy ? 'Bekle…' : 'Turu bitir'}
+          <kbd>Ctrl ↵</kbd>
+        </button>
       </div>
     </form>
   )

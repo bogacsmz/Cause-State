@@ -1,21 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { resultMeta } from '../src/renderer/src/lib/format'
+import { ek } from '../src/shared/tr'
+import { lineTone, monthYear, percent, prettyLine, signed } from '../src/renderer/src/lib/format'
 
-describe('resultMeta', () => {
-  it('counts cached input tokens and labels subscription cost as an API equivalent', () => {
-    const parts = resultMeta({
-      text: 'x',
-      model: 'claude-opus-5-5',
-      durationMs: 5900,
-      usage: { inputTokens: 2, outputTokens: 452, cacheReadTokens: 3000, cacheWriteTokens: 120 },
-      costUsd: 0.0157,
-      billing: 'subscription'
-    })
-    expect(parts).toEqual(['claude-opus-5-5', '5,9 sn', '3.122 → 452 token', "abonelik (API'de ~0,0157 $)"])
+describe('screen formatting', () => {
+  it('writes game dates as Turkish month and year', () => {
+    expect(monthYear('2026-02-01')).toBe('Şubat 2026')
+    expect(monthYear('2027-12-01')).toBe('Aralık 2027')
   })
 
-  it('shows plain cost for the API and nothing for free answers', () => {
-    expect(resultMeta({ text: 'x', durationMs: 1000, costUsd: 0.5, billing: 'api' })).toEqual(['1 sn', '~0,5 $'])
-    expect(resultMeta({ text: 'x', durationMs: 1000, costUsd: 0 })).toEqual(['1 sn'])
+  it('signs changes with a real minus', () => {
+    expect([signed(3), signed(-2), signed(0)]).toEqual(['+3', '−2', '0'])
+    expect(percent(0.149)).toBe('%15')
+  })
+
+  it('colours effect lines by direction', () => {
+    expect(['Onay +5', 'Ekonomi -1/tur', '4 tur', 'Hedef: Ekonomi -2/tur'].map(lineTone)).toEqual(['up', 'down', 'neutral', 'down'])
+    expect(prettyLine('Ekonomi -1/tur')).toBe('Ekonomi −1/tur')
+  })
+
+  it('puts the right Turkish ending after a number', () => {
+    expect([1, 3, 6, 9, 10, 40, 50, 100].map((n) => ek(n, 'de'))).toEqual(["1'de", "3'te", "6'da", "9'da", "10'da", "40'ta", "50'de", "100'de"])
+    expect(ek(6, 'den')).toBe("6'dan")
+    expect([36, 2, 5, 30].map((n) => ek(n, 'e'))).toEqual(["36'ya", "2'ye", "5'e", "30'a"])
+    expect([54, 50, 46, 60, 9].map((n) => ek(n, 'i'))).toEqual(["54'ü", "50'si", "46'sı", "60'ı", "9'u"])
   })
 })

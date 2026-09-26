@@ -1,25 +1,30 @@
-import type { AiResult } from '@shared/ipc'
+const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
-export function clockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+/** "2026-02-01" → "Şubat 2026". */
+export function monthYear(isoDate: string): string {
+  const [year, month] = isoDate.split('-')
+  return `${MONTHS[Number(month) - 1] ?? ''} ${year ?? ''}`.trim()
 }
 
-const num = (n: number, digits = 0): string => n.toLocaleString('tr-TR', { maximumFractionDigits: digits })
+/** +3 / −2 / 0, with a real minus sign. */
+export function signed(n: number): string {
+  if (n > 0) return `+${n}`
+  if (n < 0) return `−${Math.abs(n)}`
+  return '0'
+}
 
-/** Footer facts for an answer, e.g. ["claude-opus-5-5", "5,9 sn", "3.120 → 452 token", "abonelik"]. */
-export function resultMeta(result: AiResult): string[] {
-  const parts: string[] = []
-  if (result.model) parts.push(result.model)
-  parts.push(`${num(result.durationMs / 1000, 1)} sn`)
+export function percent(share: number): string {
+  return `%${Math.round(share * 100)}`
+}
 
-  if (result.usage) {
-    const { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0 } = result.usage
-    parts.push(`${num(inputTokens + cacheReadTokens + cacheWriteTokens)} → ${num(outputTokens)} token`)
-  }
+/** "Onay +5" → 'up', "Ekonomi -1/tur" → 'down', "3 tur" → 'neutral'. */
+export function lineTone(line: string): 'up' | 'down' | 'neutral' {
+  if (/\+\d/.test(line)) return 'up'
+  if (/-\d/.test(line)) return 'down'
+  return 'neutral'
+}
 
-  const cost = result.costUsd !== undefined && result.costUsd > 0 ? `${num(result.costUsd, 4)} $` : undefined
-  if (result.billing === 'subscription') parts.push(cost ? `abonelik (API'de ~${cost})` : 'abonelik')
-  else if (cost) parts.push(`~${cost}`)
-
-  return parts
+/** Effect lines use an ASCII minus from the engine; show a real one. */
+export function prettyLine(line: string): string {
+  return line.replace(/-(\d)/g, '−$1')
 }

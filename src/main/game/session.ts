@@ -33,8 +33,11 @@ export class GameSession {
     private state: GameState
   ) {}
 
-  /** Opens the most recent save in `dir`, or starts a new game if there is none. */
-  static async open(dir: string): Promise<GameSession> {
+  /**
+   * Opens the most recent save in `dir`, or starts a new game if there is none.
+   * `first` fixes the dice and id of that new game, for reproducible demos and tests.
+   */
+  static async open(dir: string, first: { seed?: number; gameId?: string } = {}): Promise<GameSession> {
     mkdirSync(dir, { recursive: true })
     const latest = latestSave(dir)
     if (latest) {
@@ -43,7 +46,7 @@ export class GameSession {
       if (state) return new GameSession(dir, store, state)
       store.close()
     }
-    const { store, state } = await startGame(dir)
+    const { store, state } = await startGame(dir, first)
     return new GameSession(dir, store, state)
   }
 
@@ -146,11 +149,11 @@ export class GameSession {
   }
 }
 
-async function startGame(dir: string): Promise<{ store: GameStore; state: GameState }> {
+async function startGame(dir: string, fixed: { seed?: number; gameId?: string } = {}): Promise<{ store: GameStore; state: GameState }> {
   // Fixed-width base-36 time, so names sort by creation.
-  const gameId = `g${Date.now().toString(36).padStart(9, '0')}`
+  const gameId = fixed.gameId ?? `g${Date.now().toString(36).padStart(9, '0')}`
   const store = GameStore.open(join(dir, `${SAVE_PREFIX}${gameId}.sqlite`))
-  const state = createNewGame({ gameId, seed: randomInt(2 ** 31) })
+  const state = createNewGame({ gameId, seed: fixed.seed ?? randomInt(2 ** 31) })
   await store.saveSnapshot(state)
   return { store, state }
 }
