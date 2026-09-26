@@ -4,13 +4,14 @@ import type { Country, Province } from '@shared/game/schema'
 // exercise the contract. Bar values and election dates are rough placeholders for
 // January 2026; the frozen "world book" in phase 2 replaces them with researched data.
 
-export const START_COUNTRIES: readonly Country[] = [
+/** Bars are also each country's starting anchors (see Country.anchors). */
+export const START_COUNTRIES: ReadonlyArray<Omit<Country, 'anchors'>> = [
   {
     id: 'TUR',
     name: 'Türkiye',
     regime: 'hybrid',
     nextElection: '2028-05-14',
-    bars: { economy: 46, stability: 58, approval: 45, welfare: 44, sovereignty: 80, military: 72, reputation: 50 }
+    bars: { economy: 46, stability: 52, approval: 45, welfare: 44, sovereignty: 80, military: 72, reputation: 50 }
   },
   {
     id: 'GRC',

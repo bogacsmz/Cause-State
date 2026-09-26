@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { and, count, desc, eq, lte, or, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL } from 'drizzle-orm'
 import type { TurnOutcome } from '@shared/game/contract'
 import type { EntityRef } from '@shared/game/primitives'
 import { GameEvent, GameState, Seed } from '@shared/game/schema'
@@ -41,12 +41,13 @@ export class GameStore {
     await this.write(this.seedInserts(list))
   }
 
-  /** Saves a whole turn in one transaction: the new snapshot, its events and its seeds. */
-  async commitTurn(outcome: Pick<TurnOutcome, 'newState' | 'events' | 'seeds'>): Promise<void> {
+  /** Saves a whole turn in one transaction: the new snapshot, its events, new seeds and seed status changes. */
+  async commitTurn(outcome: Pick<TurnOutcome, 'newState' | 'events' | 'seeds'> & Partial<Pick<TurnOutcome, 'seedUpdates'>>): Promise<void> {
     await this.write([
       this.snapshotInsert(outcome.newState),
       ...this.eventInserts(outcome.events),
-      ...this.seedInserts(outcome.seeds)
+      ...this.seedInserts(outcome.seeds),
+      ...(outcome.seedUpdates ?? []).map((seed) => this.seedUpdate(seed))
     ])
   }
 
@@ -55,12 +56,7 @@ export class GameStore {
     const row = await this.db.select({ body: seeds.body }).from(seeds).where(eq(seeds.id, id)).get()
     if (!row) throw new Error(`seed ${id} not found`)
     const seed = Seed.parse({ ...JSON.parse(row.body), status, firedTurn: status === 'fired' ? turn : null })
-    await this.write([
-      this.db
-        .update(seeds)
-        .set({ status: seed.status, firedTurn: seed.firedTurn, body: JSON.stringify(seed) })
-        .where(eq(seeds.id, id))
-    ])
+    await this.write([this.seedUpdate(seed)])
   }
 
   // ── reads ─────────────────────────────────────────────────────────────────
@@ -73,6 +69,23 @@ export class GameStore {
   async loadSnapshot(turn: number): Promise<GameState | null> {
     const row = await this.db.select({ body: snapshots.body }).from(snapshots).where(eq(snapshots.turn, turn)).get()
     return row ? GameState.parse(JSON.parse(row.body)) : null
+  }
+
+  /** Public events from `fromTurn` on, oldest first: the news feed. */
+  async feedSince(fromTurn: number): Promise<GameEvent[]> {
+    const rows = await this.db
+      .select({ body: events.body })
+      .from(events)
+      .where(and(eq(events.visibility, 'public'), gte(events.turn, fromTurn)))
+      .orderBy(asc(events.turn), asc(events.id))
+      .all()
+    return rows.map((r) => GameEvent.parse(JSON.parse(r.body)))
+  }
+
+  async seedsByIds(ids: readonly string[]): Promise<Seed[]> {
+    if (ids.length === 0) return []
+    const rows = await this.db.select({ body: seeds.body }).from(seeds).where(inArray(seeds.id, [...ids])).all()
+    return rows.map((r) => Seed.parse(JSON.parse(r.body)))
   }
 
   /** Newest first. Hidden events (e.g. planted seeds) are left out unless asked for. */
@@ -230,6 +243,14 @@ export class GameStore {
       links.length > 0 ? this.db.insert(seedEntities).values(links) : null,
       tags.length > 0 ? this.db.insert(seedTags).values(tags) : null
     ])
+  }
+
+  private seedUpdate(seed: Seed): Batchable {
+    const valid = Seed.parse(seed)
+    return this.db
+      .update(seeds)
+      .set({ status: valid.status, firedTurn: valid.firedTurn, body: JSON.stringify(valid) })
+      .where(eq(seeds.id, valid.id))
   }
 
   private async write(queries: readonly Batchable[]): Promise<void> {

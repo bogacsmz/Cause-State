@@ -27,3 +27,16 @@ export function createRng(seed: number): Rng {
     }
   }
 }
+
+/**
+ * A roll in [0, 1) fixed by a key (e.g. "game|seed|turn"). Used where the outcome must
+ * not depend on how many other dice were rolled first, such as deciding which seeds wake.
+ */
+export function hashRoll(key: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return createRng(h >>> 0).next()
+}

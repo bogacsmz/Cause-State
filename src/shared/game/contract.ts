@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { EffectId } from './catalog'
 import { Bars, CountryId, EntityRef, IsoDate, Turn } from './primitives'
-import { Dormancy, Likelihood, Regime, SeedCondition, type GameEvent, type GameState, type Seed } from './schema'
+import { Dormancy, Likelihood, Regime, SeedCondition, type GameEvent, type GameState, type Seed, type TurnReport } from './schema'
 
 // The contract between code and the LLM, both directions:
 //   code → LLM:  TurnRequest  (compact, bounded context)
@@ -13,6 +13,8 @@ export const LIMITS = {
   changes: 4,
   foreignIntents: 4,
   newSeeds: 3,
+  seedOutcomes: 3,
+  firingSeeds: 3,
   reasonChars: 300,
   seedHookChars: 300,
   activeEffects: 10,
@@ -37,6 +39,7 @@ export const TurnRequest = z.strictObject({
     bars: Bars,
     politicalCapital: z.int().min(0),
     nextElection: IsoDate.nullable(),
+    election: z.strictObject({ turnsLeft: z.int().min(0), threshold: z.int() }),
     activeEffects: z
       .array(z.strictObject({ effectId: EffectId, label: z.string(), actor: CountryId, turnsLeft: z.int().nullable() }))
       .max(LIMITS.activeEffects)
@@ -59,6 +62,21 @@ export const TurnRequest = z.strictObject({
       })
     )
     .max(LIMITS.relevantSeeds),
+  /**
+   * Seeds the code decided fire this turn. Each one needs exactly one entry in the
+   * ChangeList's seedOutcomes: the LLM decides what it turns into, the code decided when.
+   */
+  firingSeeds: z
+    .array(
+      z.strictObject({
+        id: z.string(),
+        plantedTurn: Turn,
+        hook: z.string().max(LIMITS.seedHookChars),
+        entities: z.array(EntityRef),
+        tags: z.array(z.string())
+      })
+    )
+    .max(LIMITS.firingSeeds),
   /** The player's free-text order, verbatim (trimmed to the limit). */
   order: z.string().min(1).max(LIMITS.orderChars)
 })
@@ -87,6 +105,8 @@ export type ForeignIntent = z.infer<typeof ForeignIntent>
 
 /** A consequence to remember for later. Code decides when it wakes and whether it fires. */
 export const SeedProposal = z.strictObject({
+  /** Which of this turn's changes the seed stems from, if any. */
+  source: EffectId.nullable(),
   hook: z.string().min(1).max(LIMITS.seedHookChars),
   entities: z.array(EntityRef).min(1).max(4),
   /** Free words; code normalises them into tags. */
@@ -96,6 +116,19 @@ export const SeedProposal = z.strictObject({
   condition: SeedCondition.nullable()
 })
 export type SeedProposal = z.infer<typeof SeedProposal>
+
+/**
+ * What a fired seed turns into. actor null = society or the world itself (protests, markets).
+ * effectId and target null = it plays out in the story only, with no mechanical effect.
+ */
+export const SeedOutcome = z.strictObject({
+  seedId: z.string().min(1),
+  actor: CountryId.nullable(),
+  effectId: EffectId.nullable(),
+  target: EntityRef.nullable(),
+  reason: Reason
+})
+export type SeedOutcome = z.infer<typeof SeedOutcome>
 
 export const Narration = z.strictObject({
   headline: z.string().min(1).max(120),
@@ -109,6 +142,7 @@ export const ChangeList = z.strictObject({
   changes: z.array(ProposedChange).max(LIMITS.changes),
   foreignIntents: z.array(ForeignIntent).max(LIMITS.foreignIntents),
   newSeeds: z.array(SeedProposal).max(LIMITS.newSeeds),
+  seedOutcomes: z.array(SeedOutcome).max(LIMITS.seedOutcomes),
   narration: Narration
 })
 export type ChangeList = z.infer<typeof ChangeList>
@@ -119,10 +153,19 @@ export type ApprovedChangeList = ChangeList & { readonly [approved]: true }
 
 // ── turn loop ───────────────────────────────────────────────────────────────
 
+/** Which seeds wake up this turn, decided by code before the AI is asked anything. */
+export interface SeedPlan {
+  /** Fire now; the ChangeList must give each one an outcome. */
+  firing: Seed[]
+  /** Slept too long without firing; they quietly fade. */
+  fizzled: Seed[]
+}
+
 export interface TurnAction {
-  /** The player's order as typed. */
+  /** The player's orders as typed (may be empty). */
   order: string
   changes: ApprovedChangeList
+  plan: SeedPlan
 }
 
 export interface TurnOutcome {
@@ -131,6 +174,9 @@ export interface TurnOutcome {
   events: GameEvent[]
   /** Seeds planted this turn. */
   seeds: Seed[]
+  /** Existing seeds whose status changed (fired or fizzled). */
+  seedUpdates: Seed[]
   narration: Narration
+  report: TurnReport
 }
 

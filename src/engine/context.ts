@@ -27,6 +27,8 @@ export interface TurnContextInput {
   recentEvents: readonly GameEvent[]
   /** Dormant seeds touching the entities in play, plus any already due (store query). */
   candidateSeeds: readonly Seed[]
+  /** Seeds the code decided fire this turn (from planSeeds). */
+  firing?: readonly Seed[]
 }
 
 /** Countries and provinces the order text talks about. */
@@ -85,8 +87,9 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
     .map(({ c }) => ({ id: c.id, name: c.name, regime: c.regime, bars: { ...c.bars } }))
 
   // Seeds: ones due to wake first, then those touching what this turn is about.
+  const firingIds = new Set((input.firing ?? []).map((s) => s.id))
   const seeds = input.candidateSeeds
-    .filter((s) => s.status === 'dormant')
+    .filter((s) => s.status === 'dormant' && !firingIds.has(s.id))
     .map((s) => ({
       s,
       due: s.wakeTurn <= state.turn,
@@ -112,6 +115,7 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
       bars: { ...player.bars },
       politicalCapital: state.politicalCapital.current,
       nextElection: player.nextElection,
+      election: { turnsLeft: Math.max(0, state.election.nextTurn - state.turn), threshold: state.election.threshold },
       activeEffects
     },
     world,
@@ -121,6 +125,13 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
       summary: truncate(e.summary, LIMITS.eventSummaryChars)
     })),
     seeds,
+    firingSeeds: (input.firing ?? []).slice(0, LIMITS.firingSeeds).map((s) => ({
+      id: s.id,
+      plantedTurn: s.plantedTurn,
+      hook: truncate(s.hook, LIMITS.seedHookChars),
+      entities: s.entities.slice(0, 4),
+      tags: s.tags.slice(0, 5)
+    })),
     order: truncate(input.order, LIMITS.orderChars)
   })
 }

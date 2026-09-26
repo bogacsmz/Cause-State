@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { EffectId } from './catalog'
-import { Bars, BarId, CountryId, EntityRef, entityKey, IsoDate, ProvinceId, Tag, Turn } from './primitives'
+import { Bars, BarId, BarValue, CountryId, EntityRef, entityKey, IsoDate, ProvinceId, Tag, Turn } from './primitives'
 
 // The hard state of the world and the long-term memory records. Code owns every
 // field here; the LLM only ever sees summaries of it and proposes changes to it.
@@ -14,6 +14,8 @@ export const Country = z.strictObject({
   name: z.string().min(1),
   regime: Regime,
   bars: Bars,
+  /** Where slow-moving bars (sovereignty, military, reputation) drift back to when nothing pushes them. */
+  anchors: Bars,
   /** Next national election, or null where there is none. */
   nextElection: IsoDate.nullable()
 })
@@ -41,9 +43,12 @@ export type ResolvedModifier = z.infer<typeof ResolvedModifier>
 export const ActiveEffect = z.strictObject({
   id: z.string().min(1),
   effectId: EffectId,
+  /** Who caused it. For world effects (society, markets) this is the affected country itself. */
   actor: CountryId,
   target: EntityRef,
-  source: z.enum(['player', 'foreign']),
+  source: z.enum(['player', 'foreign', 'world']),
+  /** Set when this effect is the consequence of a fired butterfly seed. */
+  seedId: z.string().nullable(),
   appliedTurn: Turn,
   /** First turn it is no longer active; null = until removed. */
   expiresTurn: Turn.nullable(),
@@ -59,7 +64,10 @@ export const EventKind = z.enum([
   'foreign_action',
   'seed_planted',
   'seed_fired',
+  'seed_fizzled',
   'election',
+  'coup',
+  'warning',
   'narration',
   'system'
 ])
@@ -104,6 +112,8 @@ export const Seed = z.strictObject({
   /** Earliest turn it may fire. */
   wakeTurn: Turn,
   originEventId: z.string().min(1),
+  /** The decision that planted it, for "this came from what you did on turn N". */
+  sourceEffectId: EffectId.nullable(),
   hook: z.string().min(1).max(600),
   entities: z.array(EntityRef).min(1),
   tags: z.array(Tag),
@@ -113,6 +123,55 @@ export const Seed = z.strictObject({
   firedTurn: Turn.nullable()
 })
 export type Seed = z.infer<typeof Seed>
+
+/** Why a bar moved this turn. */
+export const BarCause = z.strictObject({
+  label: z.string().min(1),
+  delta: z.int(),
+  kind: z.enum(['effect', 'drift', 'noise', 'event']),
+  effectId: EffectId.optional(),
+  seedId: z.string().optional()
+})
+export type BarCause = z.infer<typeof BarCause>
+
+export const BarChange = z.strictObject({
+  bar: BarId,
+  before: BarValue,
+  after: BarValue,
+  causes: z.array(BarCause)
+})
+export type BarChange = z.infer<typeof BarChange>
+
+/** End-of-turn summary for the player: every bar with its causes, plus the turn's big moments. */
+export const TurnReport = z.strictObject({
+  turn: Turn,
+  date: IsoDate,
+  bars: z.array(BarChange),
+  capital: z.strictObject({ spent: z.int().min(0), next: z.int().min(0) }),
+  firedSeeds: z.array(
+    z.strictObject({
+      seedId: z.string(),
+      plantedTurn: Turn,
+      effectId: EffectId,
+      /** The player's decision that planted it; null when the world itself set it in motion. */
+      source: EffectId.nullable(),
+      /** Where it came from, in words: the decision's name, or "Dünya gündemi". */
+      origin: z.string()
+    })
+  ),
+  expired: z.array(z.string()),
+  election: z.strictObject({ vote: z.int(), threshold: z.int(), won: z.boolean() }).nullable(),
+  coup: z.strictObject({ chance: z.number().min(0).max(1), happened: z.boolean() }).nullable()
+})
+export type TurnReport = z.infer<typeof TurnReport>
+
+export const Ending = z.strictObject({
+  kind: z.enum(['election_lost', 'coup']),
+  turn: Turn,
+  title: z.string().min(1),
+  detail: z.string()
+})
+export type Ending = z.infer<typeof Ending>
 
 /**
  * The hard state snapshot: small, the world as it is right now. History (events)
@@ -125,6 +184,15 @@ export const GameState = z
     turn: Turn,
     date: IsoDate,
     playerCountryId: CountryId,
+    status: z.enum(['playing', 'lost']),
+    ending: Ending.nullable(),
+    election: z.strictObject({
+      nextTurn: Turn,
+      everyTurns: z.int().min(1),
+      /** Vote share needed to stay in power. */
+      threshold: z.int().min(1).max(100),
+      last: z.strictObject({ turn: Turn, vote: z.int(), won: z.boolean() }).nullable()
+    }),
     politicalCapital: z.strictObject({
       current: z.int().min(0),
       perTurn: z.int().min(0),
@@ -136,7 +204,9 @@ export const GameState = z
     /** Seeded dice state (uint32); the same seed replays the same game. */
     rng: z.int().min(0).max(0xffffffff),
     /** Next number for each kind of generated id. */
-    counters: z.strictObject({ event: z.int().min(0), effect: z.int().min(0), seed: z.int().min(0) })
+    counters: z.strictObject({ event: z.int().min(0), effect: z.int().min(0), seed: z.int().min(0) }),
+    /** What happened last turn, for the end-of-turn summary. */
+    lastReport: TurnReport.nullable()
   })
   .superRefine((state, ctx) => {
     const countries = new Set(state.countries.map((c) => c.id))

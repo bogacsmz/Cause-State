@@ -45,7 +45,7 @@ const bad: Array<[string, unknown]> = [
   ['ham sayı kaçırma', variant((c) => void ((c.changes[1] as Record<string, unknown>).amount = 500))],
   ['kural dışı: başvurusuz AB üyeliği', variant((c) => void (c.changes = [{ effectId: 'eu_membership', target: { type: 'country', id: 'TUR' }, reason: 'x' }]))],
   ['yabancıya ait hamle: enerji kesintisi', variant((c) => void (c.changes = [{ effectId: 'energy_cutoff', target: { type: 'country', id: 'GRC' }, reason: 'x' }]))],
-  ['tanrı modu: bütçe aşımı', variant((c) => void (c.changes = [{ effectId: 'fiscal_stimulus', target: { type: 'country', id: 'TUR' }, reason: 'x' }, { effectId: 'military_buildup', target: { type: 'country', id: 'TUR' }, reason: 'y' }]))]
+  ['tanrı modu: bütçe aşımı', variant((c) => void (c.changes = (['tax_cut', 'fiscal_stimulus', 'military_buildup', 'anti_corruption_drive'] as const).map((effectId) => ({ effectId, target: { type: 'country' as const, id: 'TUR' }, reason: 'x' }))))]
 ]
 for (const [label, raw] of bad) {
   const v = reviewChangeList(raw, state)
@@ -56,7 +56,7 @@ for (const [label, raw] of bad) {
 // 3 ─ turn → log → queries
 say()
 say('3) Tur → olay kaydı ve tohum → SQLite sorguları')
-const outcome = applyTurn(state, { order: ORDER, changes: verdict.changes })
+const outcome = applyTurn(state, { order: ORDER, changes: verdict.changes, plan: { firing: [], fizzled: [] } })
 await store.commitTurn(outcome)
 for (const fx of outcome.newState.effects) {
   const mods = fx.modifiers
@@ -147,6 +147,7 @@ function syntheticSeeds(from: number, to: number): Seed[] {
       plantedTurn: t,
       wakeTurn: t + 12,
       originEventId: `ev-syn-${t}-0`,
+      sourceEffectId: null,
       hook: 'Bu karar ileride beklenmedik bir biçimde geri dönebilir. '.repeat(3),
       entities: [{ type: 'country', id: others[t % others.length]! }],
       tags: ['kelebek'],

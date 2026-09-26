@@ -1,6 +1,6 @@
 import type { ApprovedChangeList } from '@shared/game/contract'
 import type { GameState } from '@shared/game/schema'
-import { formatIssuesForRepair, reviewChangeList, type RefereeIssue } from './referee'
+import { formatIssuesForRepair, reviewChangeList, type RefereeIssue, type ReviewContext } from './referee'
 
 /**
  * Asks for a proposal. `feedback` is null on the first attempt; on a repair attempt it
@@ -17,12 +17,17 @@ export type LoopResult =
  * the referee checks it, and any objections go back for a bounded number of repairs.
  * Nothing touches the world until the referee approves.
  */
-export async function proposeValidateRepair(propose: Proposer, state: GameState, maxAttempts = 3): Promise<LoopResult> {
+export async function proposeValidateRepair(
+  propose: Proposer,
+  state: GameState,
+  ctx: ReviewContext = {},
+  maxAttempts = 3
+): Promise<LoopResult> {
   let feedback: string | null = null
   let last: RefereeIssue[] = []
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const verdict = reviewChangeList(await propose(feedback), state)
+    const verdict = reviewChangeList(await propose(feedback), state, ctx)
     if (verdict.ok) return { ok: true, changes: verdict.changes, attempts: attempt }
     last = verdict.issues
     feedback = formatIssuesForRepair(verdict.issues)

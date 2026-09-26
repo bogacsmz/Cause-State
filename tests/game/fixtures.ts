@@ -1,4 +1,6 @@
-import type { ChangeList } from '../../src/shared/game/contract'
+import type { ChangeList, SeedPlan } from '../../src/shared/game/contract'
+
+export const NO_SEEDS: SeedPlan = { firing: [], fizzled: [] }
 
 // A hand-written ChangeList: what the LLM should return for this order.
 export const ORDER = "AB'ye üyelik başvurusu yap ve Yunanistan'la ticaret anlaşması imzala."
@@ -19,6 +21,7 @@ export const VALID_CHANGES: ChangeList = {
   ],
   newSeeds: [
     {
+      source: 'eu_accession_bid',
       hook: "Fransa, Türkiye'nin AB sürecini ilerideki bir zirvede veto tehdidiyle durdurmaya çalışabilir.",
       entities: [
         { type: 'country', id: 'FRA' },
@@ -30,6 +33,7 @@ export const VALID_CHANGES: ChangeList = {
       condition: null
     }
   ],
+  seedOutcomes: [],
   narration: {
     headline: "Ankara Brüksel'in kapısını çaldı",
     body: 'Türkiye AB üyeliği için resmî başvurusunu yaptı. Aynı gün Yunanistan ile imzalanan ticaret anlaşması Ege limanlarında umutla karşılandı. Paris ise itirazını gizlemedi.'

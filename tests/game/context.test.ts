@@ -35,6 +35,7 @@ function history(turns: number): { events: GameEvent[]; seeds: Seed[] } {
         plantedTurn: t,
         wakeTurn: t + 10,
         originEventId: `ev-${String(t * 10).padStart(6, '0')}`,
+        sourceEffectId: null,
         hook: 'Bu karar ileride geri dönebilir. '.repeat(30),
         entities: [{ type: 'country', id: COUNTRIES[t % COUNTRIES.length]! }],
         tags: ['kelebek'],

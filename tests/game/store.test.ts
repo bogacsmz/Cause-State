@@ -8,7 +8,7 @@ import { reviewChangeList } from '../../src/engine/referee'
 import { applyTurn } from '../../src/engine/turn'
 import { GameStore } from '../../src/main/store/game-store'
 import { MIGRATIONS } from '../../src/main/store/migrations.generated'
-import { ORDER, VALID_CHANGES } from './fixtures'
+import { NO_SEEDS, ORDER, VALID_CHANGES } from './fixtures'
 
 const open: GameStore[] = []
 function tempFile(): string {
@@ -27,7 +27,7 @@ function playFirstTurn() {
   const state = createNewGame({ gameId: 'kanit', seed: 99 })
   const verdict = reviewChangeList(VALID_CHANGES, state)
   if (!verdict.ok) throw new Error('fixture should be valid')
-  return { state, outcome: applyTurn(state, { order: ORDER, changes: verdict.changes }) }
+  return { state, outcome: applyTurn(state, { order: ORDER, changes: verdict.changes, plan: NO_SEEDS }) }
 }
 
 describe('GameStore (SQLite)', () => {

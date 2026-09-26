@@ -21,7 +21,8 @@
     "package:win": "npm run build && electron-builder --win",
     "package:linux": "npm run build && electron-builder --linux",
     "db:generate": "drizzle-kit generate && node scripts/embed-migrations.mjs",
-    "kanit": "tsx --tsconfig tsconfig.node.json scripts/faz05-kanit.mts"
+    "kanit": "tsx --tsconfig tsconfig.node.json scripts/faz05-kanit.mts",
+    "playtest": "tsx --tsconfig tsconfig.node.json scripts/playtest.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

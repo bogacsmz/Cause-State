@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { proposeValidateRepair } from '../../src/engine/loop'
 import { createNewGame } from '../../src/engine/new-game'
-import { formatIssuesForRepair, reviewChangeList, type IssueCode } from '../../src/engine/referee'
+import { checkDecision, explainIssue, formatIssuesForRepair, reviewChangeList, type IssueCode } from '../../src/engine/referee'
 import { applyTurn } from '../../src/engine/turn'
-import { VALID_CHANGES, variant, ORDER } from './fixtures'
+import { NO_SEEDS, ORDER, VALID_CHANGES, variant } from './fixtures'
 
 const state = createNewGame({ gameId: 'test', seed: 7 })
 
@@ -41,6 +41,7 @@ describe('referee', () => {
   it('enforces catalog rules: EU membership needs an accession bid first', () => {
     const raw = variant((c) => {
       c.changes = [{ effectId: 'eu_membership', target: { type: 'country', id: 'TUR' }, reason: 'x' }]
+      c.newSeeds = []
     })
     expect(rejectCodes(raw)).toEqual(['rule_failed'])
   })
@@ -48,6 +49,7 @@ describe('referee', () => {
   it("stops the player from using another country's moves", () => {
     const raw = variant((c) => {
       c.changes = [{ effectId: 'energy_cutoff', target: { type: 'country', id: 'GRC' }, reason: 'x' }]
+      c.newSeeds = []
     })
     expect(rejectCodes(raw)).toEqual(['actor_not_allowed'])
   })
@@ -64,6 +66,7 @@ describe('referee', () => {
       rejectCodes(
         variant((c) => {
           c.changes = [{ effectId: 'regional_investment', target: { type: 'country', id: 'TUR' }, reason: 'x' }]
+          c.newSeeds = []
         })
       )
     ).toEqual(['wrong_target_type'])
@@ -71,6 +74,7 @@ describe('referee', () => {
       rejectCodes(
         variant((c) => {
           c.changes = [{ effectId: 'regional_investment', target: { type: 'province', id: 'GR-I' }, reason: 'x' }]
+          c.newSeeds = []
         })
       )
     ).toEqual(['rule_failed'])
@@ -79,11 +83,40 @@ describe('referee', () => {
   it('caps a turn by political capital (no god mode)', () => {
     const raw = variant((c) => {
       c.changes = [
-        { effectId: 'fiscal_stimulus', target: { type: 'country', id: 'TUR' }, reason: 'x' },
-        { effectId: 'military_buildup', target: { type: 'country', id: 'TUR' }, reason: 'y' }
+        { effectId: 'tax_cut', target: { type: 'country', id: 'TUR' }, reason: 'x' },
+        { effectId: 'fiscal_stimulus', target: { type: 'country', id: 'TUR' }, reason: 'y' },
+        { effectId: 'military_buildup', target: { type: 'country', id: 'TUR' }, reason: 'z' },
+        { effectId: 'anti_corruption_drive', target: { type: 'country', id: 'TUR' }, reason: 'w' }
       ]
+      c.newSeeds = []
     })
     expect(rejectCodes(raw)).toEqual(['over_budget'])
+  })
+
+  it('limits how many of some moves can run at once', () => {
+    const trade = (id: string) => ({ effectId: 'trade_agreement' as const, target: { type: 'country' as const, id }, reason: 'x' })
+    const raw = variant((c) => {
+      c.changes = [trade('GRC'), trade('DEU'), trade('CHN')]
+      c.newSeeds = []
+    })
+    const verdict = reviewChangeList(raw, state)
+    expect(verdict.ok).toBe(false)
+    if (!verdict.ok) expect(verdict.issues).toEqual([expect.objectContaining({ path: 'changes[2]', code: 'rule_failed' })])
+  })
+
+  it('checks a card against what the player already picked this turn', () => {
+    const tur = { type: 'country' as const, id: 'TUR' }
+    const picked = [
+      { effectId: 'tax_cut' as const, target: tur },
+      { effectId: 'trade_agreement' as const, target: { type: 'country' as const, id: 'GRC' } }
+    ]
+    expect(checkDecision(state, 'fiscal_stimulus', tur, picked)).toEqual([])
+    expect(checkDecision(state, 'tax_cut', tur, picked).map((i) => i.code)).toEqual(['duplicate'])
+    expect(checkDecision(state, 'fiscal_stimulus', tur, [...picked, { effectId: 'austerity', target: tur }]).map((i) => i.code)).toEqual([
+      'over_budget'
+    ])
+    const [issue] = checkDecision(state, 'trade_agreement', { type: 'country', id: 'DEU' }, [picked[1]!, { effectId: 'trade_agreement', target: { type: 'country', id: 'CHN' } }])
+    expect(explainIssue(issue!)).toBe('Aynı anda en fazla 2 tane yürürlükte olabilir.')
   })
 
   it('rejects duplicates, self-targeted bilateral moves and player-as-foreign', () => {
@@ -114,7 +147,7 @@ describe('referee', () => {
   it('knows what is already in effect', () => {
     const verdict = reviewChangeList(VALID_CHANGES, state)
     if (!verdict.ok) throw new Error('setup')
-    const after = applyTurn(state, { order: ORDER, changes: verdict.changes }).newState
+    const after = applyTurn(state, { order: ORDER, changes: verdict.changes, plan: NO_SEEDS }).newState
     after.politicalCapital.current = 6
     // Bid is active now, so membership is allowed; a second bid is not.
     const membership = variant((c) => {
@@ -158,7 +191,7 @@ describe('propose → validate → repair', () => {
   })
 
   it('gives up after the attempt limit and nothing is applied', async () => {
-    const result = await proposeValidateRepair(async () => ({ garbage: true }), state, 3)
+    const result = await proposeValidateRepair(async () => ({ garbage: true }), state, {}, 3)
     expect(result.ok).toBe(false)
     expect(result.attempts).toBe(3)
   })
