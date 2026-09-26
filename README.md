@@ -37,6 +37,8 @@ npm run dev
 - **Turu bitir** (Ctrl+Enter): Claude dünyayı oynar, hakem kontrol eder, kod uygular, haber brifinge akarak yazılır. Sonra tur sonu raporu açılır; geri dönen bir karar varsa en üstte "Kelebek etkisi" olarak görünür.
 - **Sağda brifing:** her ayın manşeti, geri dönen kararlar, diğer ülkelerin hamleleri ve kabineyle konuşmaların.
 
+Harita ekran kartıyla çizilir (WebGL2). Ekran kartı olmayan bir sanal makinede `CS_SOFTWARE_GL=1 npm run dev` ile yazılım çizimine geçer (yavaş ama çalışır); WebGL2 hiç yoksa oyun haritasız sürer.
+
 Oyun kendini otomatik kaydeder: uygulama klasöründe `saves/` altında her oyun ayrı bir SQLite dosyası. "Yeni oyun" eskisini silmez. Her kaydın yanında bir `.log.jsonl` dosyası da tutulur: Claude'a giden her istek, cevabı ve hakemin kararı. İleride oyuna özel küçük bir modeli eğitmek için veri seti olur.
 
 ## Gerçek uygulama olarak kurmak
