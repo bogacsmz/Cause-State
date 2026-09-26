@@ -1,0 +1,103 @@
+{
+  "file": "map/dist/world.pmtiles",
+  "bytes": 18713299,
+  "mb": 17.85,
+  "sha256": "c639ec6dbfa6c6e81dee080d273cd6c1eedae6554218a4eb596b2855125e196f",
+  "builtWith": "tippecanoe v2.49.0",
+  "source": "Natural Earth 5.1.2 (public domain), map/sources.json",
+  "zoom": {
+    "min": 0,
+    "max": 8,
+    "overzoom": true
+  },
+  "lod": {
+    "provinces": 4,
+    "provinceLabels": 5,
+    "capitals": 3,
+    "cityByScalerank": [
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        7,
+        7
+      ],
+      [
+        10,
+        8
+      ]
+    ]
+  },
+  "features": {
+    "countries": 258,
+    "country_labels": 258,
+    "provinces": 4596,
+    "province_labels": 4596,
+    "cities": 7342
+  },
+  "tiles": [
+    {
+      "z": 0,
+      "tiles": 1,
+      "kb": 64,
+      "maxTileKb": 63.8
+    },
+    {
+      "z": 1,
+      "tiles": 4,
+      "kb": 124,
+      "maxTileKb": 48.3
+    },
+    {
+      "z": 2,
+      "tiles": 16,
+      "kb": 214,
+      "maxTileKb": 41.7
+    },
+    {
+      "z": 3,
+      "tiles": 61,
+      "kb": 349,
+      "maxTileKb": 30.4
+    },
+    {
+      "z": 4,
+      "tiles": 216,
+      "kb": 1316,
+      "maxTileKb": 112.4
+    },
+    {
+      "z": 5,
+      "tiles": 695,
+      "kb": 1951,
+      "maxTileKb": 79.1
+    },
+    {
+      "z": 6,
+      "tiles": 2316,
+      "kb": 2903,
+      "maxTileKb": 32.8
+    },
+    {
+      "z": 7,
+      "tiles": 8043,
+      "kb": 4884,
+      "maxTileKb": 23.8
+    },
+    {
+      "z": 8,
+      "tiles": 29225,
+      "kb": 9905,
+      "maxTileKb": 9.9
+    }
+  ]
+}

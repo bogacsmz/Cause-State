@@ -84,6 +84,8 @@ Abonelik yolunda oyun şunlara dikkat eder:
 | `npm run kanit:faz2` | Faz 2 kanıtı, gerçek Claude ile: yaratıcı ve absürt emir, bedava soru, dış hamle, çeşitlilik, kelebek, tur 5/50/500 bağlam boyutu (`test-results/faz2/`) |
 | `npm run record:claude` | Testlerin kullandığı gerçek Claude cevaplarını yeniden kaydeder (`tests/fixtures/claude/`) |
 | `npm run db:generate` | Kayıt şeması değişince SQL göçünü üretir |
+| `npm run map:build` | Harita karolarını üretir: Natural Earth ülke/il/şehir → `map/dist/world.pmtiles` (~18 MB, git'e girmez). `tippecanoe` gerekir: `brew install tippecanoe` |
+| `npm run map:verify` | Harita dosyasının boyutunu ve sha256'sını `map/manifest.json` ile karşılaştırır |
 
 Testler canlı Claude çağırmaz: gerçek Claude cevapları kaydedilmiştir ve testler onları oynatır. Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
 
@@ -105,6 +107,7 @@ src/preload/      Arayüz ile ana süreç arasındaki tek, güvenli köprü (win
 src/renderer/     Arayüz (React): devlet masası, karar kartları, brifing, emir satırı, tur raporu
 src/shared/       İki tarafın ortak kullandığı tipler ve kanal adları
 drizzle/          Kayıt şemasının SQL göçleri (üretilir)
+map/              Harita veri hattı: Natural Earth → PMTiles betiği, kaynak/çıktı checksum'ları, kimlik dizini
 tests/            Testler
 scripts/          Smoke testi, oyun oynatıcılar (kurallı ve gerçek Claude), denge testi, model karşılaştırması, kanıtlar, göç gömücü ve ikon üretici
 build/            Uygulama ikonu

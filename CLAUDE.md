@@ -41,6 +41,10 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
   - Bir kayıt = bir dosya: `snapshots`, `events`, `seeds` ve entity/etiket bağlantı tabloları.
   - Olay kaydı sadece eklenir, silinmez. Tohumlar durum değiştirir (dormant → fired/defused), silinmez.
   - Şema değişikliği: `tables.ts` düzenle → `npm run db:generate` (drizzle-kit SQL üretir, `migrations.generated.ts` içine gömülür). Göç `PRAGMA user_version` ile ilerler.
+- `map/`: harita veri hattı (Faz 3). Natural Earth 5.1.2 (ülke, il, şehir) → tippecanoe → tek PMTiles (`map/dist/world.pmtiles`, z0–8, ötesi overzoom).
+  - Harita GameState'in görünümüdür; motor haritayı bilmez. Kimlikler oyunla aynı: ülke = `ADM0_A3` (TUR), il = ISO 3166-2 (TR-31), yoksa NE `adm1_code`. NE'nin eski kodları `ISO_FIXES` ile düzeltilir.
+  - Zoom kademesi (`LOD`, `build.mjs`): özellik kendi zoom'undan önceki karolarda hiç yoktur. z0–2 ülke adları, z3 başkentler, z4 iller + büyük şehirler, z5 il adları, z6–8 scalerank'a göre daha küçük şehirler.
+  - Git'e sadece küçük dosyalar girer: `sources.json` (sabit kaynak + sha256), `manifest.json` (boyut, sha256, karo istatistiği), `places.json` (oyunun kullanabileceği kimlikler). PMTiles ve indirmeler git dışında (`map/dist`, `map/.cache`).
 
 ## Değişmez kurallar
 
@@ -54,6 +58,7 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
 - **Model:** oyunun varsayılanı `claude-opus-5-5` (`DEFAULT_MODEL`, `src/main/config.ts`), hem CLI hem API. Faz 2'de Sonnet 5 ile karşılaştırıldı (`scripts/model-compare.mts`): ikisi de 6/6 geçerli öneri; Opus 5.5 toplamda 84 sn / $0,31, Sonnet 5 139 sn / $0,31; Opus 5.5'in haberleri daha sıkı ve kökenli, Sonnet 5 bir cevapta İngilizce kelime kaçırdı. Effort: emir okuma `low`, dünya `medium`, haber `low`. Kullanıcı istemeden model değiştirme.
 - **LLM dünyayı doğrudan değiştirmez:** ChangeList önerir, hakem onaylar, `applyTurn` uygular. Bar, etki büyüklüğü, bütçe, zar ve seçim tarihi daima koddan gelir. Claude'un rolü üç: önerici, anlatıcı, diğer ülkelerin aklı. Ne zaman olacağına (tohum patlaması, hangi ülkenin sahneye çıkacağı) kod karar verir, ne olacağına Claude.
 - **Hafıza SQLite'ta:** LLM'e her tur sadece özet + son N olay + ilgili tohumlar gider (`LIMITS`). Tarih asla prompt'ta birikmez.
+- **Harita performansı:** sadece il (admin-1), ilçe asla yok. Şehirler scalerank + zoom ile kademeli. Renk/sahiplik değişimi feature-state ile (karo yeniden inmez). Harita verisi küçük kalır (şu an 17,9 MB).
 
 ## Doğrulama (her değişiklikten sonra)
 
@@ -62,6 +67,7 @@ npm run typecheck && npm test && npm run build
 npm run kanit                                            # Faz 0.5 sözleşme kanıtı (metin raporu)
 npm run kanit:faz2                                       # Faz 2 kanıtı, gerçek Claude (abonelik harcar)
 npm run playtest                                         # denge tablosu (bot başına 200 oyun)
+npm run map:build && npm run map:verify                  # harita karoları (tippecanoe gerekir), boyut + sha256 kontrolü
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run smoke   # Linux; Mac'te sadece: npm run smoke
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli   # 20 tur, her tur ekran görüntüsü
 ```
