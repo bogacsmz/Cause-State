@@ -1,0 +1,25 @@
+appId: com.bogacsmz.causestate
+productName: Cause & State
+directories:
+  output: release/${version}
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+mac:
+  category: public.app-category.strategy-games
+  target:
+    - dmg
+    - zip
+  artifactName: Cause-State-${version}-${arch}.${ext}
+win:
+  target: nsis
+  artifactName: Cause-State-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target: AppImage
+  category: Game
+  artifactName: Cause-State-${version}.${ext}

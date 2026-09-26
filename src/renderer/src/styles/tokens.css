@@ -1,0 +1,36 @@
+/* Design tokens — "map room": ink-dark surfaces, warm paper text, brass accents. */
+:root {
+  color-scheme: dark;
+
+  --ink-0: #0a0e12;
+  --ink-1: #0e1419;
+  --ink-2: #131a21;
+  --ink-3: #19222b;
+  --line: #212b35;
+  --line-strong: #2d3945;
+
+  --paper: #ece5d7;
+  --paper-2: #c7bfae;
+  --muted: #8b9197;
+  --faint: #5b636b;
+
+  --brass: #c9a55c;
+  --brass-hi: #dcbd7a;
+  --brass-lo: #7c6536;
+  --brass-glow: rgb(201 165 92 / 0.14);
+
+  --ok: #86b28c;
+  --warn: #d9a64e;
+  --err: #d46a52;
+
+  --sea-rim: #2b3945;
+  --grat: #1b2631;
+  --equator: #2a3a47;
+
+  --font-serif: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  --radius: 6px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
