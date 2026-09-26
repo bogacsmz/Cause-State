@@ -2,11 +2,16 @@
 
 Kararlarının kelebek etkisiyle geri döndüğü, yapay zeka destekli modern dünya strateji oyunu. Tek oyunculu, tamamen senin bilgisayarında çalışan bir masaüstü uygulaması. Oyunu Claude yönetir, kuralları kod korur.
 
-> Durum: **Faz 0 (iskelet) tamam.** Uygulama açılıyor, emir satırına yazdığın şey Claude'a gidiyor ve cevap harf harf akıyor. Harita Faz 1'de geliyor. Yol haritası: vault'taki `Oyun/Yol-Haritasi.md`.
+> Durum: **Faz 0 (iskelet) ve Faz 0.5 (sözleşme) tamam.**
+> - Uygulama açılıyor, emir satırına yazdığın şey Claude'a gidiyor ve cevap harf harf akıyor.
+> - Oyunun kemikleri hazır: şema, SQLite hafızası (olay kaydı ve kelebek tohumları), kod↔yapay zeka sözleşmesi ve hakem.
+> - Sıradaki: Faz 1, salt metin çekirdek döngü. Harita Faz 3'te.
+>
+> Yol haritası: vault'taki `Oyun/Yol-Haritasi.md`.
 
 ## Gereksinimler (Mac)
 
-- **Node.js 22 veya üstü:** `brew install node`
+- **Node.js 22.16 veya üstü:** `brew install node`
 - **Claude Code** kurulu ve giriş yapılmış olmalı. Terminalde `claude` yazınca açılıyorsa hazırsın.
 
 ## İlk kurulum
@@ -58,6 +63,8 @@ Her cevabın altında "abonelik (API'de ~0,008 $)" gibi bir not görürsün. Bu,
 | `npm run typecheck` | TypeScript tip kontrolü |
 | `npm run build` | Derler (`out/` klasörü) |
 | `npm run smoke` | Derlenmiş uygulamayı açıp emir gönderir, ekran görüntüsü alır (`test-results/`) |
+| `npm run kanit` | Faz 0.5 kanıtı: oyun kaydı, hakem, olay/tohum sorguları ve bağlam boyutu raporu |
+| `npm run db:generate` | Kayıt şeması değişince SQL göçünü üretir |
 
 Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
 
@@ -68,13 +75,17 @@ CS_LIVE_CLI=1 npx vitest run tests/live-cli.test.ts
 ## Klasörler
 
 ```text
-src/main/       Uygulamanın ana süreci: pencere, yapay zeka çağrıları (ileride oyun motoru ve kayıt)
-  ai/           Yapay zeka katmanı: claude -p (abonelik), API anahtarı, sahte sağlayıcı
-src/preload/    Arayüz ile ana süreç arasındaki tek, güvenli köprü (window.cs)
-src/renderer/   Arayüz (React): üst çubuk, harita alanı, brifing paneli, emir satırı
-src/shared/     İki tarafın ortak kullandığı tipler ve kanal adları
-prompts/        Yapay zeka prompt'ları
-tests/          Testler
-scripts/        Smoke testi ve ikon üretici
-build/          Uygulama ikonu
+src/shared/game/  Oyunun şeması: durum, olay, tohum, etki sözlüğü, kod↔yapay zeka sözleşmesi
+src/engine/       Saf oyun motoru: hakem, öner→doğrula→onar, tur, bağlam kurucu, zar
+src/main/         Uygulamanın ana süreci: pencere, yapay zeka çağrıları
+  ai/             Yapay zeka katmanı: claude -p (abonelik), API anahtarı, sahte sağlayıcı
+  store/          SQLite kayıt: anlık görüntüler, olay kaydı, tohumlar
+src/preload/      Arayüz ile ana süreç arasındaki tek, güvenli köprü (window.cs)
+src/renderer/     Arayüz (React): üst çubuk, harita alanı, brifing paneli, emir satırı
+src/shared/       İki tarafın ortak kullandığı tipler ve kanal adları
+drizzle/          Kayıt şemasının SQL göçleri (üretilir)
+prompts/          Yapay zeka prompt'ları
+tests/            Testler
+scripts/          Smoke testi, Faz 0.5 kanıtı, göç gömücü ve ikon üretici
+build/            Uygulama ikonu
 ```
