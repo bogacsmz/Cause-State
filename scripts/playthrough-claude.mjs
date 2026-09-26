@@ -2,6 +2,8 @@
 // messages a month for 20 months, a screenshot of every month and a readable log.
 // Run `npm run build` first. Uses your Claude subscription (claude -p).
 //   xvfb-run -a -s "-screen 0 1600x1000x24" node scripts/playthrough-claude.mjs [turns=20] [out=test-results/oyun-claude]
+// If the game ends early (a lost election), `from=12 turns=8 id=... out=...` starts a new
+// game at that line of the script, so the two runs together play all 20 months.
 import { mkdirSync, mkdtempSync, writeFileSync, copyFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +11,7 @@ import { _electron as electron } from 'playwright'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => a.split('=')))
 const turns = Number(args.turns ?? 20)
+const from = Number(args.from ?? 0)
 const outDir = args.out ?? 'test-results/oyun-claude'
 mkdirSync(outDir, { recursive: true })
 
@@ -68,11 +71,11 @@ try {
   const shot = (name) => page.screenshot({ path: join(outDir, name) })
   await shot('00-baslangic.png')
 
-  const ask = async (text, n, k) => {
+  const ask = async (text, n, k, line) => {
     await page.fill('#order', text)
     await page.keyboard.press('Enter')
     await page.waitForSelector('.chat--live', { timeout: 20_000 })
-    if (k === 0 && (n === 1 || n === 5 || n === 18)) {
+    if (k === 0 && (line === 1 || line === 5 || line === 18)) {
       await page.waitForSelector('.chat--live .caret', { timeout: 120_000 }).catch(() => undefined)
       await page.waitForTimeout(1200)
       await shot(`${String(n).padStart(2, '0')}-akis.png`)
@@ -92,8 +95,8 @@ try {
     if (v.status !== 'playing') break
     const n = v.turn + 1
     say(`\nTUR ${n} — anket %${v.player.bars[0].value}, seçime ${v.player.election.turnsLeft} ay, sermaye ${v.player.capital.left}`)
-    const messages = SCRIPT[t] ?? ['Durum nedir?']
-    for (const [k, text] of messages.entries()) await ask(text, n, k)
+    const messages = SCRIPT[from + t] ?? ['Durum nedir?']
+    for (const [k, text] of messages.entries()) await ask(text, n, k, from + t + 1)
     v = await view()
     await shot(`${String(n).padStart(2, '0')}a-plan.png`)
 

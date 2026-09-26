@@ -230,6 +230,35 @@ describe('repair on a malformed answer', () => {
     expect(provider.prompts[1]).toContain('political capital')
     expect(result.decisions).toHaveLength(3)
   })
+
+  it('a world move the referee rejects is repaired, and the log keeps its verdict', async () => {
+    const world = (effectId: string) =>
+      JSON.stringify({
+        interpretation: 'Hükûmet vergileri indirdi.',
+        foreignIntents: [{ actor: 'RUS', effectId, target: { type: 'country', id: 'TUR' }, reason: 'Moskova tepki gösterdi.' }],
+        newSeeds: [],
+        seedOutcomes: []
+      })
+    // Tax cuts are the player's move only; a diplomatic note is what Moscow can do.
+    const provider = new Scripted([world('tax_cut'), world('diplomatic_protest'), 'Vergiler indi\n\nAnkara vergileri indirdi.'])
+    const log: BrainCall[] = []
+    const { resolution, fallback } = await new ClaudeBrain(provider).resolve(
+      {
+        state,
+        decisions: [{ effectId: 'tax_cut', target: { type: 'country', id: 'TUR' }, reason: 'x' }],
+        orders: ['Vergileri indir'],
+        dueSeeds: [],
+        relevantSeeds: [],
+        recentEvents: []
+      },
+      { onCall: (c) => log.push(c) }
+    )
+    expect(fallback).toBeUndefined()
+    expect(provider.prompts[1]).toContain('The referee rejected your previous answer')
+    expect(log.map((c) => `${c.role}${c.attempt}:${c.issues.length > 0 ? 'rejected' : 'ok'}`)).toEqual(['resolve1:rejected', 'resolve2:ok', 'narrate1:ok'])
+    expect(log[0]!.issues.join(' ')).toContain('foreignIntents')
+    expect(resolution.outcome.events.some((e) => e.kind === 'foreign_action')).toBe(true)
+  })
 })
 
 describe('reading streamed text', () => {

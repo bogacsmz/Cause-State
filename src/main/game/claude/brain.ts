@@ -250,11 +250,19 @@ export class ClaudeBrain implements GameBrain {
     let fallback: string | undefined
     // The code decides who moves abroad this month; Claude decides what they do.
     const onStage = spotlight(state, input.decisions)
+    // Each world proposal is logged once the referee has judged it: its objections arrive
+    // as the next attempt's feedback, or with the final resolution.
+    let unjudged: BrainCall | null = null
+    const judge = (issues: string[]): void => {
+      if (unjudged) hooks.onCall?.({ ...unjudged, issues })
+      unjudged = null
+    }
 
     const makeProposer = (plan: SeedPlan) => {
       let attempt = 0
       return async (feedback: string | null): Promise<unknown> => {
         attempt += 1
+        judge(feedback ? feedback.split('\n').flatMap((line) => (line.startsWith('- ') ? [line.slice(2)] : [])) : [])
         hooks.onPhase?.('world')
         const request = buildTurnRequest({
           state,
@@ -269,7 +277,8 @@ export class ClaudeBrain implements GameBrain {
         const prompt = feedback
           ? `${payload}\n\nThe referee rejected your previous answer. Fix every problem and answer again with the complete JSON document.\n${feedback}`
           : payload
-        const answer = await this.call('resolve', state.turn, attempt, prompt, RESOLVE_SYSTEM, hooks, { schema: WORLD_REPLY_SCHEMA })
+        const answer = await this.call('resolve', state.turn, attempt, prompt, RESOLVE_SYSTEM, hooks, { schema: WORLD_REPLY_SCHEMA, log: false })
+        unjudged = callRecord('resolve', state.turn, attempt, prompt, answer, [])
         hooks.onPhase?.('referee')
         const world = WorldReplyWire.safeParse(safeJson(answer.text))
         // A malformed answer goes to the referee as is: its schema check sends the reasons back.
@@ -290,7 +299,9 @@ export class ClaudeBrain implements GameBrain {
     let resolution: TurnResolution
     try {
       resolution = await resolveTurn(state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds }, makeProposer)
+      judge(resolution.ok ? [] : resolution.issues.map((i) => `${i.path || '(root)'}: ${i.message}`))
     } catch (err) {
+      judge([`(no verdict: ${errorText(err)})`])
       fallback = `Dünya hamlesi için Claude'a ulaşılamadı (${errorText(err)}); kurallı yedek kullanıldı.`
       resolution = await resolveTurn(state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds })
     }
@@ -344,7 +355,7 @@ export class ClaudeBrain implements GameBrain {
         ...(this.opts.model ? { model: this.opts.model } : {}),
         ...options
       })
-      // Interpretations are logged by the caller, once the referee's verdict is known.
+      // Interpretations and world proposals are logged by the caller, once the referee's verdict is known.
       if (log) hooks.onCall?.(callRecord(role, turn, attempt, prompt, result, []))
       return result
     } catch (err) {
