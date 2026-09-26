@@ -24,8 +24,8 @@ export function DecisionDeck({ view, busy, onPick }: Props): React.JSX.Element {
     <section className="deck" aria-label="Kararlar">
       <div className="deck__head">
         <div className="section-head">
-          <span className="eyebrow">Kararlar</span>
-          <span className="section-head__meta">her biri 1 sermaye · nota bedava</span>
+          <span className="eyebrow">Hazır kararlar</span>
+          <span className="section-head__meta">kısayol · asıl oyun aşağıdaki emir kutusunda</span>
         </div>
         <div className="tabs" role="tablist">
           <Tab active={tab === 'all'} onClick={() => setTab('all')}>

@@ -1,8 +1,9 @@
 import { EFFECTS } from '@shared/game/catalog'
-import { LIMITS, TurnRequest } from '@shared/game/contract'
+import { LIMITS, TurnRequest, type ProposedChange } from '@shared/game/contract'
 import { entityKey, type EntityRef } from '@shared/game/primitives'
-import type { GameEvent, GameState, Seed } from '@shared/game/schema'
-import { findCountry } from './lookup'
+import type { ActiveEffect, GameEvent, GameState, Seed } from '@shared/game/schema'
+import { worldBookFor } from '@shared/game/world-book'
+import { findCountry, owningCountry } from './lookup'
 import { estimateTokens, truncate } from './util'
 
 // Builds what the LLM sees each turn. Everything is capped, so the request stays the
@@ -11,13 +12,21 @@ import { estimateTokens, truncate } from './util'
 
 /** Extra names players use for countries (matched at the start of a word). */
 const ALIASES: Record<string, readonly string[]> = {
-  USA: ['abd', 'amerika'],
-  GRC: ['yunan'],
-  DEU: ['alman'],
-  FRA: ['fransız'],
-  RUS: ['rus'],
-  CHN: ['çin'],
-  IRN: ['iran']
+  USA: ['abd', 'amerika', 'washington', 'beyaz saray'],
+  GRC: ['yunan', 'atina'],
+  DEU: ['alman', 'berlin'],
+  FRA: ['fransız', 'paris'],
+  RUS: ['rus', 'moskova', 'kremlin'],
+  CHN: ['çin', 'pekin'],
+  IRN: ['iran', 'tahran'],
+  GBR: ['ingiltere', 'ingiliz', 'britanya', 'londra'],
+  UKR: ['ukrayna', 'kiev', 'kyiv'],
+  SYR: ['suriye', 'şam'],
+  IRQ: ['irak', 'bağdat', 'erbil'],
+  ISR: ['israil', 'tel aviv'],
+  SAU: ['suudi', 'riyad'],
+  AZE: ['azerbaycan', 'azeri', 'bakü'],
+  EGY: ['mısır', 'kahire']
 }
 
 export interface TurnContextInput {
@@ -29,6 +38,8 @@ export interface TurnContextInput {
   candidateSeeds: readonly Seed[]
   /** Seeds the code decided fire this turn (from planSeeds). */
   firing?: readonly Seed[]
+  /** Decisions already committed this month (approved by the referee). */
+  decisions?: readonly ProposedChange[]
 }
 
 /** Countries and provinces the order text talks about. */
@@ -45,10 +56,31 @@ export function mentionedEntities(state: GameState, text: string): EntityRef[] {
   return refs
 }
 
-/** The player's country plus everything the order mentions: what seeds are fetched by. */
-export function relevantEntities(state: GameState, order: string): EntityRef[] {
-  const refs = [{ type: 'country', id: state.playerCountryId } as const, ...mentionedEntities(state, order)]
+/** The player's country, everything the order mentions and every decision's target: what seeds are fetched by. */
+export function relevantEntities(state: GameState, order: string, decisions: readonly ProposedChange[] = []): EntityRef[] {
+  const refs: EntityRef[] = [
+    { type: 'country', id: state.playerCountryId },
+    ...decisions.map((d) => d.target),
+    ...mentionedEntities(state, order)
+  ]
   return refs.filter((r, i) => refs.findIndex((o) => entityKey(o) === entityKey(r)) === i)
+}
+
+/** Running arrangements between the player and another country, most recent first. */
+function tiesWith(state: GameState, countryId: string): string[] {
+  const player = state.playerCountryId
+  const touches = (e: ActiveEffect): boolean => {
+    const target = owningCountry(state, e.target)
+    return (e.actor === player && target === countryId) || (e.actor === countryId && target === player)
+  }
+  return state.effects
+    .filter(touches)
+    .sort((a, b) => b.appliedTurn - a.appliedTurn)
+    .slice(0, LIMITS.ties)
+    .map((e) => {
+      const left = e.expiresTurn === null ? 'permanent' : `${Math.max(0, e.expiresTurn - state.turn - 1)} turns left`
+      return `${e.effectId} ${e.actor}→${owningCountry(state, e.target) ?? e.target.id} (${left})`
+    })
 }
 
 export function buildTurnRequest(input: TurnContextInput): TurnRequest {
@@ -56,7 +88,8 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
   const player = findCountry(state, state.playerCountryId)
   if (!player) throw new Error(`player country ${state.playerCountryId} missing`)
 
-  const relevant = new Set(relevantEntities(state, input.order).map(entityKey))
+  const decisions = input.decisions ?? []
+  const relevant = new Set(relevantEntities(state, input.order, decisions).map(entityKey))
 
   const activeEffects = state.effects
     .filter((e) => e.actor === player.id || e.modifiers.some((m) => m.country === player.id))
@@ -66,6 +99,7 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
       effectId: e.effectId,
       label: EFFECTS[e.effectId].label,
       actor: e.actor,
+      target: e.target,
       turnsLeft: e.expiresTurn === null ? null : Math.max(0, e.expiresTurn - state.turn)
     }))
 
@@ -74,17 +108,20 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
     .sort((a, b) => b.turn - a.turn || b.id.localeCompare(a.id))
     .slice(0, LIMITS.recentEvents)
 
-  // Other countries, most relevant first: named in the order, then in recent news, then the rest.
+  // Other countries, most relevant first: named in the order or targeted, then tied to us by
+  // something running, then in recent news, then the rest.
   const inNews = new Set(recent.flatMap((e) => e.entities).map(entityKey))
-  const world = state.countries
+  const ranked = state.countries
     .filter((c) => c.id !== player.id)
     .map((c, index) => {
       const key = `country:${c.id}`
-      return { c, index, rank: relevant.has(key) ? 0 : inNews.has(key) ? 1 : 2 }
+      const ties = tiesWith(state, c.id)
+      return { c, index, ties, rank: relevant.has(key) ? 0 : ties.length > 0 ? 1 : inNews.has(key) ? 2 : 3 }
     })
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .slice(0, LIMITS.worldCountries)
-    .map(({ c }) => ({ id: c.id, name: c.name, regime: c.regime, bars: { ...c.bars } }))
+  const world = ranked.map(({ c, ties }) => ({ id: c.id, name: c.name, regime: c.regime, bars: { ...c.bars }, ties }))
+  const worldBook = worldBookFor(ranked.map(({ c }) => c.id)).slice(0, LIMITS.worldBookEntries)
 
   // Seeds: ones due to wake first, then those touching what this turn is about.
   const firingIds = new Set((input.firing ?? []).map((s) => s.id))
@@ -119,6 +156,7 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
       activeEffects
     },
     world,
+    worldBook,
     recentEvents: recent.map((e) => ({
       turn: e.turn,
       title: e.title,
@@ -132,7 +170,13 @@ export function buildTurnRequest(input: TurnContextInput): TurnRequest {
       entities: s.entities.slice(0, 4),
       tags: s.tags.slice(0, 5)
     })),
-    order: truncate(input.order, LIMITS.orderChars)
+    decisions: decisions.slice(0, LIMITS.changes).map((d) => ({
+      effectId: d.effectId,
+      label: EFFECTS[d.effectId].label,
+      target: d.target,
+      reason: truncate(d.reason, LIMITS.reasonChars)
+    })),
+    order: input.order.trim() ? truncate(input.order, LIMITS.orderChars) : ''
   })
 }
 

@@ -3,7 +3,7 @@
 
 import type { EffectId } from './game/catalog'
 import type { EntityRef } from './game/primitives'
-import type { ActionResult, GameView } from './game/view'
+import type { ActionResult, GameProgress, GameView } from './game/view'
 
 export const IPC = {
   aiStatus: 'ai:status',
@@ -15,7 +15,8 @@ export const IPC = {
   gameCommand: 'game:command',
   gamePick: 'game:pick',
   gameUnpick: 'game:unpick',
-  gameEndTurn: 'game:end-turn'
+  gameEndTurn: 'game:end-turn',
+  gameProgress: 'game:progress'
 } as const
 
 /** Which backend answers AI calls: Claude Code CLI (subscription), API key, or offline mock. */
@@ -73,6 +74,8 @@ export interface GameBridge {
   pick: (effectId: EffectId, target: EntityRef) => Promise<ActionResult>
   unpick: (pendingId: string) => Promise<GameView>
   endTurn: () => Promise<GameView>
+  /** Live progress while the AI works (streamed replies, the news being written). Returns an unsubscribe. */
+  onProgress: (listener: (event: GameProgress) => void) => () => void
 }
 
 /** What the preload script exposes to the UI as `window.cs`. */

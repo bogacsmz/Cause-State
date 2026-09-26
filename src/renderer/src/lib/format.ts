@@ -1,10 +1,4 @@
-const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
-
-/** "2026-02-01" → "Şubat 2026". */
-export function monthYear(isoDate: string): string {
-  const [year, month] = isoDate.split('-')
-  return `${MONTHS[Number(month) - 1] ?? ''} ${year ?? ''}`.trim()
-}
+export { monthYear } from '@shared/tr'
 
 /** +3 / −2 / 0, with a real minus sign. */
 export function signed(n: number): string {

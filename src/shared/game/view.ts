@@ -68,15 +68,31 @@ export interface FeedEvent {
   origin?: { turn: number; label: string; butterfly: boolean }
 }
 
-/** A line of conversation with the advisor. Talking is free. */
+/** A line of conversation with the cabinet. Talking is free; orders become decisions. */
 export interface ChatEntry {
   id: string
   /** The turn it was said in (before that turn ended). */
   turn: number
   text: string
   reply: string
-  kind: 'decision' | 'talk'
+  kind: 'action' | 'talk'
+  /** Moves added to the month's plan, e.g. "Sınıra yığınak · Suriye". */
+  decisions: string[]
+  /** Proposals the referee turned down before the final answer, with its reasons. */
+  rejected: Array<{ reply: string; reasons: string[] }>
+  /** Moves the cabinet talked about, with their real numbers from the catalog. */
+  discussed: Array<{ label: string; lines: string[] }>
+  /** Set when Claude could not be reached and the scripted rules answered. */
+  fallback?: string
 }
+
+/** Live progress from the main process while the AI works. */
+export type GameProgress =
+  | { kind: 'chat'; chatId: string; text: string }
+  | { kind: 'reply'; chatId: string; text: string; attempt: number }
+  | { kind: 'rejected'; chatId: string; attempt: number; reply: string; reasons: string[] }
+  | { kind: 'phase'; phase: 'world' | 'referee' | 'news' }
+  | { kind: 'narration'; delta: string }
 
 export interface BarView {
   id: BarId
@@ -118,6 +134,8 @@ export interface GameView {
   chat: ChatEntry[]
   /** Approval by turn, for the poll chart. */
   polls: Array<{ turn: number; approval: number }>
+  /** Who reads the orders and plays the world, and the last thing to know about it. */
+  ai: { kind: 'claude' | 'scripted'; notice: string | null }
 }
 
 /** Answer to a typed order or a picked card. */

@@ -23,7 +23,8 @@
     "db:generate": "drizzle-kit generate && node scripts/embed-migrations.mjs",
     "kanit": "tsx --tsconfig tsconfig.node.json scripts/faz05-kanit.mts",
     "playtest": "tsx --tsconfig tsconfig.node.json scripts/playtest.mts",
-    "playthrough": "node scripts/playthrough.mjs"
+    "playthrough": "node scripts/playthrough.mjs",
+    "record:claude": "tsx --tsconfig tsconfig.node.json scripts/record-claude-fixtures.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

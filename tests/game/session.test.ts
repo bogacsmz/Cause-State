@@ -33,7 +33,7 @@ describe('GameSession (main process)', () => {
     const talk = await s.command('Durum nedir?')
     expect(talk.ok).toBe(false)
     expect(talk.view.player.capital.left).toBe(2)
-    expect(talk.view.chat.map((c) => c.kind)).toEqual(['decision', 'talk'])
+    expect(talk.view.chat.map((c) => c.kind)).toEqual(['action', 'talk'])
   })
 
   it('refuses a card the rules do not allow, and lets a pick be taken back', async () => {

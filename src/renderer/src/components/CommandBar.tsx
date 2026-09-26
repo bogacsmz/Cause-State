@@ -24,7 +24,10 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
   const submit = async (e?: FormEvent): Promise<void> => {
     e?.preventDefault()
     if (!canSend) return
-    if (await onCommand(order.trim())) setOrder('')
+    const text = order.trim()
+    // The message moves to the briefing at once; it comes back only if it could not be sent.
+    setOrder('')
+    if (!(await onCommand(text))) setOrder(text)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -85,7 +88,7 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
           value={order}
           onChange={(e) => setOrder(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={'Bir emir ver ("vergileri indir", "Yunanistan ile ticaret anlaşması yap") ya da danışmana sor…'}
+          placeholder={'Ne istiyorsan yaz: "Suriye sınırına asker yığ, Rusya ile gizli görüşme ayarla" ya da "Durum nedir?"'}
           disabled={!playing}
           spellCheck={false}
         />
@@ -93,7 +96,7 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
           Gönder
         </button>
         <button type="button" className="btn btn--primary btn--turn" onClick={onEndTurn} disabled={!playing || busy}>
-          {busy ? 'Bekle…' : 'Turu bitir'}
+          {busy ? 'Bekleniyor…' : 'Turu bitir'}
           <kbd>Ctrl ↵</kbd>
         </button>
       </div>

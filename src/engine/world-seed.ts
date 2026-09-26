@@ -61,6 +61,62 @@ export const START_COUNTRIES: ReadonlyArray<Omit<Country, 'anchors'>> = [
     regime: 'authoritarian',
     nextElection: null,
     bars: { economy: 68, stability: 72, approval: 62, welfare: 55, sovereignty: 95, military: 90, reputation: 45 }
+  },
+  {
+    id: 'GBR',
+    name: 'Birleşik Krallık',
+    regime: 'democracy',
+    nextElection: '2029-08-01',
+    bars: { economy: 60, stability: 62, approval: 36, welfare: 68, sovereignty: 80, military: 78, reputation: 64 }
+  },
+  {
+    id: 'UKR',
+    name: 'Ukrayna',
+    regime: 'democracy',
+    nextElection: null,
+    bars: { economy: 25, stability: 30, approval: 55, welfare: 30, sovereignty: 45, military: 70, reputation: 60 }
+  },
+  {
+    id: 'SYR',
+    name: 'Suriye',
+    regime: 'hybrid',
+    nextElection: null,
+    bars: { economy: 12, stability: 20, approval: 40, welfare: 12, sovereignty: 25, military: 28, reputation: 30 }
+  },
+  {
+    id: 'IRQ',
+    name: 'Irak',
+    regime: 'hybrid',
+    nextElection: '2029-11-01',
+    bars: { economy: 40, stability: 38, approval: 35, welfare: 35, sovereignty: 45, military: 45, reputation: 35 }
+  },
+  {
+    id: 'ISR',
+    name: 'İsrail',
+    regime: 'democracy',
+    nextElection: '2026-10-27',
+    bars: { economy: 62, stability: 45, approval: 38, welfare: 66, sovereignty: 85, military: 85, reputation: 35 }
+  },
+  {
+    id: 'SAU',
+    name: 'Suudi Arabistan',
+    regime: 'authoritarian',
+    nextElection: null,
+    bars: { economy: 66, stability: 70, approval: 60, welfare: 62, sovereignty: 85, military: 66, reputation: 50 }
+  },
+  {
+    id: 'AZE',
+    name: 'Azerbaycan',
+    regime: 'authoritarian',
+    nextElection: '2031-02-01',
+    bars: { economy: 50, stability: 68, approval: 60, welfare: 48, sovereignty: 78, military: 60, reputation: 45 }
+  },
+  {
+    id: 'EGY',
+    name: 'Mısır',
+    regime: 'authoritarian',
+    nextElection: '2030-12-01',
+    bars: { economy: 34, stability: 50, approval: 40, welfare: 32, sovereignty: 70, military: 70, reputation: 42 }
   }
 ]
 
@@ -68,5 +124,11 @@ export const START_PROVINCES: readonly Province[] = [
   { id: 'TR-06', name: 'Ankara', owner: 'TUR', controller: 'TUR' },
   { id: 'TR-34', name: 'İstanbul', owner: 'TUR', controller: 'TUR' },
   { id: 'TR-35', name: 'İzmir', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-01', name: 'Adana', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-07', name: 'Antalya', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-21', name: 'Diyarbakır', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-27', name: 'Gaziantep', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-31', name: 'Hatay', owner: 'TUR', controller: 'TUR' },
+  { id: 'TR-61', name: 'Trabzon', owner: 'TUR', controller: 'TUR' },
   { id: 'GR-I', name: 'Attika', owner: 'GRC', controller: 'GRC' }
 ]

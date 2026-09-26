@@ -41,7 +41,12 @@ const bridge: CsBridge = {
     command: (text) => ipcRenderer.invoke(IPC.gameCommand, text) as ReturnType<GameBridge['command']>,
     pick: (effectId, target) => ipcRenderer.invoke(IPC.gamePick, effectId, target) as ReturnType<GameBridge['pick']>,
     unpick: (pendingId) => ipcRenderer.invoke(IPC.gameUnpick, pendingId) as ReturnType<GameBridge['unpick']>,
-    endTurn: () => ipcRenderer.invoke(IPC.gameEndTurn) as ReturnType<GameBridge['endTurn']>
+    endTurn: () => ipcRenderer.invoke(IPC.gameEndTurn) as ReturnType<GameBridge['endTurn']>,
+    onProgress: (listener) => {
+      const handler = (_event: IpcRendererEvent, progress: Parameters<typeof listener>[0]): void => listener(progress)
+      ipcRenderer.on(IPC.gameProgress, handler)
+      return () => ipcRenderer.removeListener(IPC.gameProgress, handler)
+    }
   }
 }
 

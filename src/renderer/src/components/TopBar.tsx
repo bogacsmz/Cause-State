@@ -35,22 +35,27 @@ export function TopBar({ platform, view, ai, onNewGame }: Props): React.JSX.Elem
         <button type="button" className="linkbtn" onClick={onNewGame}>
           Yeni oyun
         </button>
-        <AiPill ai={ai} />
+        <AiPill ai={ai} brain={view?.ai.kind} />
       </div>
     </header>
   )
 }
 
-// Phase 1 plays with the scripted AI; the pill says so and shows whether Claude is ready for phase 2.
-function AiPill({ ai }: { ai: AiStatus | null }): React.JSX.Element {
-  const claude = ai ? `${ai.label}${ai.ready ? '' : ` (${ai.detail})`}` : 'kontrol ediliyor'
+/** Who reads the orders: Claude (with its connection state) or the offline scripted rules. */
+function AiPill({ ai, brain }: { ai: AiStatus | null; brain: 'claude' | 'scripted' | undefined }): React.JSX.Element {
+  if (brain === 'scripted') {
+    return (
+      <span className="status status--ok" title="Çevrimdışı mod: emirleri kurallı senaryo yapay zekası yorumluyor. Sayılar ve kurallar her zaman koddan.">
+        <span className="status__dot" aria-hidden="true" />
+        <span className="status__label">Senaryo YZ</span>
+      </span>
+    )
+  }
+  const tone = ai === null ? 'pending' : ai.ready ? 'ok' : 'down'
   return (
-    <span
-      className="status status--ok"
-      title={`Faz 1: emirleri senaryo yapay zekası yorumluyor, kurallar ve sayılar koddan.\nClaude bağlantısı (Faz 2): ${claude}`}
-    >
+    <span className={`status status--${tone}`} title={ai ? `${ai.detail}\nSayılar ve kurallar her zaman koddan; Claude önerir ve anlatır.` : undefined}>
       <span className="status__dot" aria-hidden="true" />
-      <span className="status__label">Senaryo YZ · Faz 1</span>
+      <span className="status__label">{ai?.label ?? 'Claude bağlanıyor…'}</span>
     </span>
   )
 }

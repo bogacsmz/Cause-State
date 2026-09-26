@@ -50,7 +50,7 @@ export function App(): React.JSX.Element {
         onUnpick={game.unpick}
         onEndTurn={game.endTurn}
       />
-      <BriefingPanel view={view} />
+      <BriefingPanel view={view} liveChat={game.liveChat} liveTurn={game.liveTurn} />
       {game.reportOpen && view.status === 'playing' && <TurnReport view={view} onClose={game.closeReport} />}
       {view.status === 'lost' && <GameOver view={view} busy={game.busy} onNewGame={game.newGame} />}
     </div>

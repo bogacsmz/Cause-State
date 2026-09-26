@@ -11,7 +11,8 @@ import { Dormancy, Likelihood, Regime, SeedCondition, type GameEvent, type GameS
 export const LIMITS = {
   orderChars: 1500,
   changes: 4,
-  foreignIntents: 4,
+  /** Other countries act sparingly: at most this many moves a month. */
+  foreignIntents: 2,
   newSeeds: 3,
   seedOutcomes: 3,
   firingSeeds: 3,
@@ -21,7 +22,11 @@ export const LIMITS = {
   worldCountries: 12,
   recentEvents: 12,
   eventSummaryChars: 280,
-  relevantSeeds: 8
+  relevantSeeds: 8,
+  /** World-book entries sent per request: only the countries this turn is about. */
+  worldBookEntries: 4,
+  /** Running arrangements listed per country ("trade_agreement TUR→DEU"). */
+  ties: 4
 } as const
 
 /** Upper bound for a serialised TurnRequest, in estimated tokens. */
@@ -41,12 +46,41 @@ export const TurnRequest = z.strictObject({
     nextElection: IsoDate.nullable(),
     election: z.strictObject({ turnsLeft: z.int().min(0), threshold: z.int() }),
     activeEffects: z
-      .array(z.strictObject({ effectId: EffectId, label: z.string(), actor: CountryId, turnsLeft: z.int().nullable() }))
+      .array(
+        z.strictObject({
+          effectId: EffectId,
+          label: z.string(),
+          actor: CountryId,
+          target: EntityRef,
+          turnsLeft: z.int().nullable()
+        })
+      )
       .max(LIMITS.activeEffects)
   }),
   world: z
-    .array(z.strictObject({ id: CountryId, name: z.string(), regime: Regime, bars: Bars }))
+    .array(
+      z.strictObject({
+        id: CountryId,
+        name: z.string(),
+        regime: Regime,
+        bars: Bars,
+        /** Running arrangements between this country and the player, e.g. "trade_agreement TUR→DEU (3 turns left)". */
+        ties: z.array(z.string()).max(LIMITS.ties)
+      })
+    )
     .max(LIMITS.worldCountries),
+  /** The frozen world book's entries for the countries this turn is about. */
+  worldBook: z
+    .array(
+      z.strictObject({
+        id: CountryId,
+        stance: z.enum(['ally', 'partner', 'rival', 'wary', 'hostile']),
+        agenda: z.string(),
+        onTurkey: z.string(),
+        levers: z.array(EffectId)
+      })
+    )
+    .max(LIMITS.worldBookEntries),
   recentEvents: z
     .array(z.strictObject({ turn: Turn, title: z.string(), summary: z.string().max(LIMITS.eventSummaryChars) }))
     .max(LIMITS.recentEvents),
@@ -77,8 +111,12 @@ export const TurnRequest = z.strictObject({
       })
     )
     .max(LIMITS.firingSeeds),
-  /** The player's free-text order, verbatim (trimmed to the limit). */
-  order: z.string().min(1).max(LIMITS.orderChars)
+  /** Decisions the player's government has already committed to this month (approved by the referee). */
+  decisions: z
+    .array(z.strictObject({ effectId: EffectId, label: z.string(), target: EntityRef, reason: z.string() }))
+    .max(LIMITS.changes),
+  /** The player's free-text order(s), verbatim (trimmed to the limit); empty when nothing was typed. */
+  order: z.string().max(LIMITS.orderChars)
 })
 export type TurnRequest = z.infer<typeof TurnRequest>
 

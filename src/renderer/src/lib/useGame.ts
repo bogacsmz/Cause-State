@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { EffectId } from '@shared/game/catalog'
 import type { EntityRef } from '@shared/game/primitives'
-import type { GameView } from '@shared/game/view'
+import type { GameProgress, GameView } from '@shared/game/view'
 
 export interface Notice {
   id: number
   tone: 'ok' | 'info' | 'error'
   text: string
+}
+
+/** A message the cabinet is still answering: shown in the briefing as it streams. */
+export interface LiveChat {
+  id: string
+  text: string
+  reply: string
+  rejected: Array<{ reply: string; reasons: string[] }>
+}
+
+/** The month being played out: which step, and the news as it is written. */
+export interface LiveTurn {
+  phase: 'world' | 'referee' | 'news' | null
+  narration: string
 }
 
 /** The game as the UI sees it: the latest view from the main process, plus UI-only state. */
@@ -24,12 +38,16 @@ export function useGame(): {
   endTurn: () => void
   newGame: () => void
   loadError: string | null
+  liveChat: LiveChat | null
+  liveTurn: LiveTurn | null
 } {
   const [view, setView] = useState<GameView | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [liveChat, setLiveChat] = useState<LiveChat | null>(null)
+  const [liveTurn, setLiveTurn] = useState<LiveTurn | null>(null)
   const noticeId = useRef(0)
   const busyRef = useRef(false)
 
@@ -44,6 +62,33 @@ export function useGame(): {
       .then(setView)
       .catch((err: unknown) => setLoadError(message(err)))
   }, [])
+
+  // Live progress from the main process: the cabinet's reply and the month's news as they stream.
+  useEffect(
+    () =>
+      window.cs.game.onProgress((event: GameProgress) => {
+        switch (event.kind) {
+          case 'chat':
+            setLiveChat({ id: event.chatId, text: event.text, reply: '', rejected: [] })
+            break
+          case 'reply':
+            setLiveChat((c) => (c && c.id === event.chatId ? { ...c, reply: event.text } : c))
+            break
+          case 'rejected':
+            setLiveChat((c) =>
+              c && c.id === event.chatId ? { ...c, reply: '', rejected: [...c.rejected, { reply: event.reply, reasons: event.reasons }] } : c
+            )
+            break
+          case 'phase':
+            setLiveTurn((t) => ({ phase: event.phase, narration: t?.narration ?? '' }))
+            break
+          case 'narration':
+            setLiveTurn((t) => ({ phase: t?.phase ?? 'news', narration: (t?.narration ?? '') + event.delta }))
+            break
+        }
+      }),
+    []
+  )
 
   // Runs one call at a time; the main process queues too, this just keeps the buttons honest.
   const guarded = useCallback(
@@ -66,12 +111,19 @@ export function useGame(): {
 
   const command = useCallback(
     async (text: string): Promise<boolean> => {
-      const result = await guarded(() => window.cs.game.command(text))
+      const result = await guarded(async () => {
+        try {
+          return await window.cs.game.command(text)
+        } finally {
+          setLiveChat(null)
+        }
+      })
       if (!result) return false
       setView(result.view)
+      if (result.view.ai.notice) say('info', result.view.ai.notice)
       return true
     },
-    [guarded]
+    [guarded, say]
   )
 
   const pick = useCallback(
@@ -94,11 +146,17 @@ export function useGame(): {
 
   const endTurn = useCallback(() => {
     void guarded(async () => {
-      const next = await window.cs.game.endTurn()
-      setView(next)
-      setReportOpen(next.report !== null)
+      setLiveTurn({ phase: null, narration: '' })
+      try {
+        const next = await window.cs.game.endTurn()
+        setView(next)
+        setReportOpen(next.report !== null)
+        if (next.ai.notice) say('info', next.ai.notice)
+      } finally {
+        setLiveTurn(null)
+      }
     })
-  }, [guarded])
+  }, [guarded, say])
 
   const newGame = useCallback(() => {
     void guarded(async () => {
@@ -119,7 +177,9 @@ export function useGame(): {
     unpick,
     endTurn,
     newGame,
-    loadError
+    loadError,
+    liveChat,
+    liveTurn
   }
 }
 

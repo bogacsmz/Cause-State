@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, EFFECTS, PLAYER_EFFECT_IDS, type EffectDef } from '@shared/game/catalog'
+import { CARD_EFFECT_IDS, CATEGORY_LABELS, EFFECTS, type EffectDef } from '@shared/game/catalog'
 import { BAR_LABELS, countryRef, type BarId, type EntityRef } from '@shared/game/primitives'
 import type { GameEvent, GameState, Seed } from '@shared/game/schema'
 import type {
@@ -35,7 +35,7 @@ export function effectLines(def: EffectDef): string[] {
 export function decisionOptions(state: GameState, pending: readonly Decision[] = []): DecisionOption[] {
   const player = state.playerCountryId
   const left = state.politicalCapital.current - pending.reduce((n, d) => n + EFFECTS[d.effectId].cost, 0)
-  return PLAYER_EFFECT_IDS.map((id) => {
+  return CARD_EFFECT_IDS.map((id) => {
     const def = EFFECTS[id]
     const bilateral = def.rules.some((r) => r.kind === 'target_not_actor')
     const candidates: EntityRef[] =
@@ -77,7 +77,10 @@ export function decisionOptions(state: GameState, pending: readonly Decision[] =
 export interface PendingDecision {
   id: string
   decision: Decision
+  /** The typed order it came from, if any. */
   order: string | null
+  /** What concretely happens, as the AI read the order; recorded with the event. */
+  reason: string | null
 }
 
 export interface ViewInput {
@@ -89,9 +92,18 @@ export interface ViewInput {
   pending?: readonly PendingDecision[]
   chat?: readonly ChatEntry[]
   polls?: GameView['polls']
+  ai?: GameView['ai']
 }
 
-export function buildView({ state, feed, seeds, pending = [], chat = [], polls = [] }: ViewInput): GameView {
+export function buildView({
+  state,
+  feed,
+  seeds,
+  pending = [],
+  chat = [],
+  polls = [],
+  ai = { kind: 'scripted', notice: null }
+}: ViewInput): GameView {
   const player = state.playerCountryId
   const me = findCountry(state, player)
   if (!me) throw new Error(`player country ${player} missing`)
@@ -184,6 +196,7 @@ export function buildView({ state, feed, seeds, pending = [], chat = [], polls =
     report,
     feed: feedView,
     chat: [...chat],
-    polls: [...polls]
+    polls: [...polls],
+    ai
   }
 }

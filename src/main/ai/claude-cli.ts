@@ -54,7 +54,7 @@ export class ClaudeCliProvider implements LlmProvider {
 
     const started = Date.now()
     const systemFile = await this.writeSystemPrompt(req.system)
-    const args = buildCliArgs({ systemFile, model: this.opts.model })
+    const args = buildCliArgs({ systemFile, model: req.model ?? this.opts.model, schema: req.schema, effort: req.effort })
 
     const child = spawn(cmd.path, cmd.needsShell ? args.map(quoteForCmd) : args, {
       cwd: this.opts.workDir,
@@ -87,6 +87,7 @@ export class ClaudeCliProvider implements LlmProvider {
     child.stdin.end(req.prompt)
 
     let streamed = ''
+    let streamedJson = ''
     let model: string | undefined
     let result: Extract<ReturnType<typeof parseCliLine>, { kind: 'result' }> | undefined
 
@@ -94,7 +95,12 @@ export class ClaudeCliProvider implements LlmProvider {
     for await (const line of lines) {
       const event = parseCliLine(line)
       if (event.kind === 'text') {
+        // With a schema the answer is the JSON document; stray text around it is not part of it.
+        if (req.schema) continue
         streamed += event.text
+        req.onText?.(event.text)
+      } else if (event.kind === 'json') {
+        streamedJson += event.text
         req.onText?.(event.text)
       } else if (event.kind === 'model') {
         model = event.model
@@ -115,9 +121,9 @@ export class ClaudeCliProvider implements LlmProvider {
     if (req.signal?.aborted) throw abortError()
 
     if (result?.ok) {
-      const text = result.text || streamed
+      const text = result.text || (req.schema ? streamedJson : streamed)
       // Without partial messages (older CLI) nothing streamed; deliver the whole answer at once.
-      if (!streamed && text) req.onText?.(text)
+      if (!(req.schema ? streamedJson : streamed) && text) req.onText?.(text)
       return {
         text,
         model,
@@ -149,7 +155,12 @@ export class ClaudeCliProvider implements LlmProvider {
   }
 }
 
-export function buildCliArgs(opts: { systemFile: string; model?: string }): string[] {
+export function buildCliArgs(opts: {
+  systemFile: string
+  model?: string
+  schema?: Record<string, unknown>
+  effort?: string
+}): string[] {
   return [
     '-p',
     '--output-format',
@@ -167,7 +178,10 @@ export function buildCliArgs(opts: { systemFile: string; model?: string }): stri
     '--strict-mcp-config',
     '--disable-slash-commands',
     '--no-session-persistence',
-    ...(opts.model ? ['--model', opts.model] : [])
+    ...(opts.model ? ['--model', opts.model] : []),
+    ...(opts.effort ? ['--effort', opts.effort] : []),
+    // Structured output: the CLI makes Claude answer with a document that matches the schema.
+    ...(opts.schema ? ['--json-schema', JSON.stringify(opts.schema)] : [])
   ]
 }
 

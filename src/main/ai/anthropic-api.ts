@@ -50,11 +50,15 @@ export class AnthropicApiProvider implements LlmProvider {
     try {
       const stream = this.client.beta.messages.stream(
         {
-          model: this.opts.model,
+          model: req.model ?? this.opts.model,
           max_tokens: 64000,
-          system: req.system,
+          // The system prompt is the stable part (catalog, rules, world): cache it across turns.
+          system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
           messages: [{ role: 'user', content: req.prompt }],
-          output_config: { effort: 'low' },
+          output_config: {
+            effort: req.effort ?? 'low',
+            ...(req.schema ? { format: { type: 'json_schema' as const, schema: req.schema } } : {})
+          },
           // If a safety classifier declines, the API retries on a fallback model in the same call.
           betas: ['server-side-fallback-2026-07-01'],
           fallbacks: 'default'

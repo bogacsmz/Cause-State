@@ -201,6 +201,8 @@ function explainRule(rule: EffectRule): string {
       return `"${EFFECTS[rule.effectId].label}" sürerken yapılamaz.`
     case 'max_active':
       return `Aynı anda en fazla ${rule.count} tane yürürlükte olabilir.`
+    case 'military_edge':
+      return 'Hedef karşısında yeterli askerî üstünlüğümüz yok.'
   }
 }
 
@@ -284,6 +286,13 @@ function checkRule(state: GameState, rule: Exclude<EffectRule, { kind: 'max_acti
     case 'forbids_active': {
       const on = rule.on === 'actor' ? a.actor : targetCountry
       return on && isEffectActiveOn(state, rule.effectId, on) ? `not possible while "${rule.effectId}" is in effect on ${on}` : null
+    }
+    case 'military_edge': {
+      const own = findCountry(state, a.actor)?.bars.military ?? 0
+      const theirs = (targetCountry ? findCountry(state, targetCountry)?.bars.military : undefined) ?? 0
+      return own - theirs >= rule.margin
+        ? null
+        : `${a.actor} lacks the clear military edge over ${targetCountry} this needs (its forces are not strong enough)`
     }
   }
 }

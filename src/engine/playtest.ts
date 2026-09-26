@@ -1,4 +1,4 @@
-import { EFFECTS, PLAYER_EFFECT_IDS, type EffectId } from '@shared/game/catalog'
+import { CARD_EFFECT_IDS, EFFECTS, type EffectId } from '@shared/game/catalog'
 import type { GameState, Seed } from '@shared/game/schema'
 import { createNewGame } from './new-game'
 import { checkDecision } from './referee'
@@ -37,7 +37,7 @@ export const BOTS: Record<string, Bot> = {
   rastgele: (s, rng) => {
     const wishes: Wish[] = []
     for (let i = 0; i < 6; i++) {
-      const effectId = PLAYER_EFFECT_IDS[Math.floor(rng.next() * PLAYER_EFFECT_IDS.length)]!
+      const effectId = CARD_EFFECT_IDS[Math.floor(rng.next() * CARD_EFFECT_IDS.length)]!
       const targets = decisionOptions(s).find((o) => o.effectId === effectId)!.targets
       wishes.push([effectId, targets[Math.floor(rng.next() * targets.length)]!.ref.id])
     }

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { EffectId } from '@shared/game/catalog'
 import { LIMITS } from '@shared/game/contract'
 import { EntityRef } from '@shared/game/primitives'
@@ -7,6 +7,13 @@ import type { GameSession } from './session'
 
 // The UI is untrusted: every argument is checked before it reaches the game.
 export function registerGameIpc(session: GameSession): void {
+  // Streamed replies and news go to every open window as they are written.
+  session.onProgress((event) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.webContents.isDestroyed()) win.webContents.send(IPC.gameProgress, event)
+    }
+  })
+
   ipcMain.handle(IPC.gameView, () => session.view())
   ipcMain.handle(IPC.gameNew, () => session.newGame())
   ipcMain.handle(IPC.gameEndTurn, () => session.endTurn())

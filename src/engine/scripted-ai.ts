@@ -409,7 +409,8 @@ function containsWord(haystack: string, word: string): boolean {
 // ── the turn's ChangeList ───────────────────────────────────────────────────
 
 export interface ScriptInput {
-  decisions: readonly Decision[]
+  /** The month's decisions; a recorded reason (e.g. from the AI's reading of an order) is kept. */
+  decisions: readonly (Decision & { reason?: string })[]
   orders: readonly string[]
   plan: SeedPlan
 }
@@ -424,7 +425,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   const changes = input.decisions.map((d) => ({
     effectId: d.effectId,
     target: d.target,
-    reason: `${EFFECTS[d.effectId].label} kararı${d.target.id === player ? '' : ` (${name(d.target)})`}.`
+    reason: d.reason ?? `${EFFECTS[d.effectId].label} kararı${d.target.id === player ? '' : ` (${name(d.target)})`}.`
   }))
 
   const foreignIntents: ForeignIntent[] = []

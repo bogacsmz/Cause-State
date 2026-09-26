@@ -36,3 +36,11 @@ export function ek(n: number, kind: NumberCase): string {
   }[kind]
   return `${n}'${suffix}`
 }
+
+const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+
+/** "2026-02-01" → "Şubat 2026". */
+export function monthYear(isoDate: string): string {
+  const [year, month] = isoDate.split('-')
+  return `${MONTHS[Number(month) - 1] ?? ''} ${year ?? ''}`.trim()
+}

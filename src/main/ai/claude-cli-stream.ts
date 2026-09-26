@@ -6,6 +6,8 @@ import type { AiUsage } from '@shared/ipc'
 
 export type CliEvent =
   | { kind: 'text'; text: string }
+  /** A fragment of structured output (the JSON being written, with --json-schema). */
+  | { kind: 'json'; text: string }
   | { kind: 'model'; model: string }
   | {
       kind: 'result'
@@ -42,6 +44,9 @@ export function parseCliLine(line: string): CliEvent {
       if (event?.type === 'content_block_delta' && delta?.type === 'text_delta' && typeof delta.text === 'string') {
         return { kind: 'text', text: delta.text }
       }
+      if (event?.type === 'content_block_delta' && delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+        return { kind: 'json', text: delta.partial_json }
+      }
       return IGNORE
     }
 
@@ -49,7 +54,13 @@ export function parseCliLine(line: string): CliEvent {
       return {
         kind: 'result',
         ok: msg.is_error !== true && msg.subtype === 'success',
-        text: typeof msg.result === 'string' ? msg.result : '',
+        // With --json-schema the validated document arrives as structured_output.
+        text:
+          msg.structured_output !== undefined && msg.structured_output !== null
+            ? JSON.stringify(msg.structured_output)
+            : typeof msg.result === 'string'
+              ? msg.result
+              : '',
         costUsd: typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : undefined,
         usage: parseUsage(msg.usage),
         durationMs: typeof msg.duration_ms === 'number' ? msg.duration_ms : undefined

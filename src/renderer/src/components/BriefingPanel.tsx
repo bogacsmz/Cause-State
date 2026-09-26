@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { ChatEntry, FeedEvent, GameView } from '@shared/game/view'
 import { ek } from '@shared/tr'
-import { monthYear } from '../lib/format'
+import { lineTone, monthYear, prettyLine } from '../lib/format'
+import type { LiveChat, LiveTurn } from '../lib/useGame'
 
 // News first, then what it changed, then the small print. Order events are left out:
 // the decisions and the conversation already say what the player asked for.
@@ -23,10 +24,16 @@ interface TurnGroup {
   chat: ChatEntry[]
 }
 
-export function BriefingPanel({ view }: { view: GameView }): React.JSX.Element {
+interface Props {
+  view: GameView
+  liveChat: LiveChat | null
+  liveTurn: LiveTurn | null
+}
+
+export function BriefingPanel({ view, liveChat, liveTurn }: Props): React.JSX.Element {
   const listRef = useRef<HTMLDivElement>(null)
   const groups = useMemo(() => groupByTurn(view), [view])
-  const lastKey = `${view.turn}:${view.feed.length}:${view.chat.length}`
+  const lastKey = `${view.turn}:${view.feed.length}:${view.chat.length}:${liveChat?.reply.length ?? -1}:${liveChat?.rejected.length ?? 0}:${liveTurn?.narration.length ?? -1}:${liveTurn?.phase ?? ''}`
 
   // Follow the newest news.
   useEffect(() => {
@@ -55,8 +62,10 @@ export function BriefingPanel({ view }: { view: GameView }): React.JSX.Element {
             {g.chat.map((c) => (
               <Chat key={c.id} entry={c} />
             ))}
+            {g.turn === view.turn && liveChat && <LiveChatBubble chat={liveChat} />}
           </section>
         ))}
+        {liveTurn && <TurnInProgress turn={liveTurn} next={view.turn + 1} />}
       </div>
     </aside>
   )
@@ -150,11 +159,93 @@ function Chat({ entry: c }: { entry: ChatEntry }): React.JSX.Element {
   return (
     <div className={`chat chat--${c.kind}`}>
       <p className="chat__you">{c.text}</p>
-      <p className="chat__reply">
-        <span className="chat__who">Danışman</span>
+      {c.rejected.map((r, i) => (
+        <Rejected key={i} reply={r.reply} reasons={r.reasons} />
+      ))}
+      <div className="chat__reply">
+        <span className="chat__who">{c.kind === 'talk' ? 'Danışman · bedava' : 'Kabine'}</span>
         {c.reply}
+        {c.decisions.length > 0 && (
+          <ul className="chat__moves">
+            {c.decisions.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+        )}
+        {c.discussed.map((d) => (
+          <div key={d.label} className="chat__preview">
+            <span>{d.label}</span>
+            {d.lines.map((l) => (
+              <span key={l} className={`chip chip--${lineTone(l)}`}>
+                {prettyLine(l)}
+              </span>
+            ))}
+          </div>
+        ))}
+        {c.fallback && <span className="chat__fallback">Yedek cevap: Claude'a ulaşılamadı.</span>}
+      </div>
+    </div>
+  )
+}
+
+/** A proposal the referee turned down before the final answer. */
+function Rejected({ reply, reasons }: { reply: string; reasons: string[] }): React.JSX.Element {
+  return (
+    <div className="chat__rejected">
+      <p className="chat__rejected-reply">{reply}</p>
+      <p className="chat__referee">
+        <span className="chat__who chat__who--referee">Hakem reddetti</span>
+        {reasons.join(' · ')}
       </p>
     </div>
+  )
+}
+
+function LiveChatBubble({ chat }: { chat: LiveChat }): React.JSX.Element {
+  return (
+    <div className="chat chat--live">
+      <p className="chat__you">{chat.text}</p>
+      {chat.rejected.map((r, i) => (
+        <Rejected key={i} reply={r.reply} reasons={r.reasons} />
+      ))}
+      <p className="chat__reply">
+        <span className="chat__who">Kabine</span>
+        {chat.reply || <span className="thinking">düşünüyor</span>}
+        {chat.reply && <span className="caret" aria-hidden="true" />}
+      </p>
+    </div>
+  )
+}
+
+const PHASES: Record<NonNullable<LiveTurn['phase']>, string> = {
+  world: 'Dünya hamlesini düşünüyor',
+  referee: 'Hakem kontrol ediyor',
+  news: 'Haber yazılıyor'
+}
+
+/** The month being played out: steps, then the news streaming in. */
+function TurnInProgress({ turn, next }: { turn: LiveTurn; next: number }): React.JSX.Element {
+  const [headline, ...rest] = turn.narration.split('\n')
+  return (
+    <section className="turn turn--live" aria-live="polite">
+      <h2 className="turn__head">
+        <span>Tur {next}</span>
+        <span className="turn__phase">{turn.phase ? PHASES[turn.phase] : 'Başlıyor'}</span>
+      </h2>
+      <article className="news news--live">
+        {turn.narration ? (
+          <>
+            <h3 className="news__headline">{headline}</h3>
+            <p className="news__body">
+              {rest.join('\n').trim()}
+              <span className="caret" aria-hidden="true" />
+            </p>
+          </>
+        ) : (
+          <p className="news__body thinking">{turn.phase ? PHASES[turn.phase] : 'Ay başlıyor'}</p>
+        )}
+      </article>
+    </section>
   )
 }
 

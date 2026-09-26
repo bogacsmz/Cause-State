@@ -5,6 +5,7 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import advisorPrompt from '../../prompts/advisor.md?raw'
 import { createProvider } from './ai'
 import { readAiConfig } from './config'
+import { ClaudeBrain, ScriptedBrain } from './game/claude/brain'
 import { registerGameIpc } from './game/ipc'
 import { GameSession } from './game/session'
 import { registerAiIpc } from './ipc'
@@ -42,9 +43,15 @@ async function start(): Promise<void> {
 
   // Save files live in the user's app data folder. For tests and demos, CS_SAVE_DIR moves
   // them and CS_GAME_SEED / CS_GAME_ID make the first new game reproducible.
+  // Claude reads the orders and plays the world; the offline mock provider means the
+  // scripted rules from phase 1 (tests, demos without Claude).
+  const brain = provider.id === 'mock' ? new ScriptedBrain() : new ClaudeBrain(provider)
   const session = await GameSession.open(process.env.CS_SAVE_DIR ?? join(app.getPath('userData'), 'saves'), {
-    ...(process.env.CS_GAME_SEED ? { seed: Number(process.env.CS_GAME_SEED) } : {}),
-    ...(process.env.CS_GAME_ID ? { gameId: process.env.CS_GAME_ID } : {})
+    brain,
+    first: {
+      ...(process.env.CS_GAME_SEED ? { seed: Number(process.env.CS_GAME_SEED) } : {}),
+      ...(process.env.CS_GAME_ID ? { gameId: process.env.CS_GAME_ID } : {})
+    }
   })
   registerGameIpc(session)
   app.on('will-quit', () => session.close())
