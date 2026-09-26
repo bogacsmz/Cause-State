@@ -26,12 +26,14 @@
     "playthrough": "node scripts/playthrough.mjs",
     "record:claude": "tsx --tsconfig tsconfig.node.json scripts/record-claude-fixtures.mts",
     "kanit:faz2": "tsx --tsconfig tsconfig.node.json scripts/faz2-kanit.mts",
-    "map:build": "node map/build.mjs",
-    "map:verify": "node map/verify.mjs"
+    "map:build": "node map/build.mjs && node map/relief.mjs && node map/fonts.mjs",
+    "map:verify": "node map/verify.mjs",
+    "kanit:harita": "node scripts/harita-kanit.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "drizzle-orm": "^0.45.3",
+    "pmtiles": "^4.5.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -46,9 +48,13 @@
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "geotiff": "^3.0.5",
+    "maplibre-gl": "^6.11.2",
     "playwright": "^1.63.0",
+    "polylabel": "^2.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "sharp": "^0.35.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",

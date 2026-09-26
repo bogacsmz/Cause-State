@@ -6,4 +6,4 @@ release/
 .DS_Store
 test-results/
 map/.cache/
-map/dist/
+map/.work/

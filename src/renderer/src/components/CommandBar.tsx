@@ -6,12 +6,14 @@ interface Props {
   view: GameView
   busy: boolean
   notice: Notice | null
+  deckOpen: boolean
+  onToggleDeck: () => void
   onCommand: (text: string) => Promise<boolean>
   onUnpick: (id: string) => void
   onEndTurn: () => void
 }
 
-export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn }: Props): React.JSX.Element {
+export function CommandBar({ view, busy, notice, deckOpen, onToggleDeck, onCommand, onUnpick, onEndTurn }: Props): React.JSX.Element {
   const [order, setOrder] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const playing = view.status === 'playing'
@@ -45,11 +47,11 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
   const { left, max } = view.player.capital
 
   return (
-    <form className="command" onSubmit={(e) => void submit(e)}>
+    <form className="command hud-panel" onSubmit={(e) => void submit(e)}>
       <div className="command__plan">
         <span className="eyebrow">Bu ay</span>
         {view.pending.length === 0 ? (
-          <span className="command__empty">Henüz karar yok. Kart seç ya da emir yaz; hiçbir şey yapmamak da bir karardır.</span>
+          <span className="command__empty">Henüz karar yok; hiçbir şey yapmamak da bir karardır.</span>
         ) : (
           <ul className="pending">
             {view.pending.map((p) => (
@@ -68,6 +70,9 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
         <span className="command__capital">
           {left}/{max} sermaye kaldı
         </span>
+        <button type="button" className={`btn btn--ghost btn--deck${deckOpen ? ' btn--on' : ''}`} onClick={onToggleDeck} aria-expanded={deckOpen}>
+          Hazır kararlar
+        </button>
       </div>
 
       {notice && (
@@ -88,7 +93,7 @@ export function CommandBar({ view, busy, notice, onCommand, onUnpick, onEndTurn 
           value={order}
           onChange={(e) => setOrder(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={'Ne istiyorsan yaz: "Suriye sınırına asker yığ, Rusya ile gizli görüşme ayarla" ya da "Durum nedir?"'}
+          placeholder={'Emir ya da soru: "Suriye sınırına asker yığ" · "Durum nedir?"'}
           disabled={!playing}
           spellCheck={false}
         />

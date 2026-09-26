@@ -7,7 +7,7 @@ Tasarım belgeleri kod reposunda değil, vault'ta durur (`bogacsmz/obsidian_vaul
 - `Tasarim-Fikirleri.md`: onaylanmış mekanikler ve elenen fikirler (elenenleri tekrar önerme)
 - `Kararlar.md`
 
-Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Sıradaki: Faz 3, harita (kullanıcıyla birlikte açılacak).
+Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) sürüyor: veri hattı ve tam ekran harita hazır; sırada GameState → renk ve komşuluk grafiği.
 
 ## Mimari (kod = tek gerçek, LLM = sadece bulanık iş)
 
@@ -41,10 +41,13 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
   - Bir kayıt = bir dosya: `snapshots`, `events`, `seeds` ve entity/etiket bağlantı tabloları.
   - Olay kaydı sadece eklenir, silinmez. Tohumlar durum değiştirir (dormant → fired/defused), silinmez.
   - Şema değişikliği: `tables.ts` düzenle → `npm run db:generate` (drizzle-kit SQL üretir, `migrations.generated.ts` içine gömülür). Göç `PRAGMA user_version` ile ilerler.
-- `map/`: harita veri hattı (Faz 3). Natural Earth 5.1.2 (ülke, il, şehir) → tippecanoe → tek PMTiles (`map/dist/world.pmtiles`, z0–8, ötesi overzoom).
-  - Harita GameState'in görünümüdür; motor haritayı bilmez. Kimlikler oyunla aynı: ülke = `ADM0_A3` (TUR), il = ISO 3166-2 (TR-31), yoksa NE `adm1_code`. NE'nin eski kodları `ISO_FIXES` ile düzeltilir.
-  - Zoom kademesi (`LOD`, `build.mjs`): özellik kendi zoom'undan önceki karolarda hiç yoktur. z0–2 ülke adları, z3 başkentler, z4 iller + büyük şehirler, z5 il adları, z6–8 scalerank'a göre daha küçük şehirler.
-  - Git'e sadece küçük dosyalar girer: `sources.json` (sabit kaynak + sha256), `manifest.json` (boyut, sha256, karo istatistiği), `places.json` (oyunun kullanabileceği kimlikler). PMTiles ve indirmeler git dışında (`map/dist`, `map/.cache`).
+- Harita (Faz 3): oyunun ana arayüzü, GameState'in görünümü. Motor haritayı bilmez.
+  - **Tam paket:** harita dosyaları repoda ve uygulamanın içinde (`resources/map/`: `world.pmtiles` 17,9 MB, `physical.pmtiles` 3,5 MB, `relief.pmtiles` 1,7 MB, `fonts/` 15 glif dosyası; toplam 24,6 MB). electron-builder `extraResources` ile `.app`'in `Resources/map` klasörüne kopyalar. Temiz klonda `npm install && npm run dev` haritayı açar; dışarıya bağımlı tek şey yapay zeka.
+  - `src/main/map/protocol.ts`: ana süreç dosyaları `cs-map://` üzerinden sunar (`tiles/<world|physical|relief>/{z}/{x}/{y}`, `fonts/<yığın>/<aralık>.pbf`). pmtiles kütüphanesi dosyayı diskte açık tutar, karoyu açıp verir. Başka hiçbir şey sunulmaz.
+  - `src/renderer/src/map/`: MapLibre GL 6. `style.ts` katmanlar ve renkler, projeksiyon tek yerde (`MAP_PROJECTION`, şimdi `mercator`). `MapView.tsx` tam ekran tuval; eğim ve döndürme kapalı, önbellek sınırı 160 karo/kaynak, uzakta (z<3) piksel oranı 1. WebGL2 yoksa oyun haritasız sürer. `PerfOverlay.tsx`: F2 ile FPS, en uzun kare, karo ve bellek.
+  - Kimlikler oyunla aynı: ülke = `ADM0_A3` (TUR), il = ISO 3166-2 (TR-31), yoksa NE `adm1_code`. `promoteId` ile feature id'si bunlar (feature-state için). NE'nin eski kodları `ISO_FIXES` ile düzeltilir.
+  - Zoom kademesi (`LOD`, `map/build.mjs`): özellik kendi zoom'undan önceki karolarda hiç yoktur. z0–2 ülke adları, z3 başkentler, z4 iller + büyük şehirler, z5 il adları, z6–8 scalerank'a göre küçük şehirler.
+  - Yeniden üretmek (sadece geliştirici): `npm run map:build` (tippecanoe gerekir; geotiff/sharp/polylabel dev bağımlılığı). Kaynaklar `map/sources.json`'da sabit ve sha256'lı, çıktılar `map/manifest.json`'da. Aynı girdi aynı dosyayı verir. `map/places.json` oyunun kullanabileceği kimlikler (testlerde).
 
 ## Değişmez kurallar
 
@@ -58,7 +61,7 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
 - **Model:** oyunun varsayılanı `claude-opus-5-5` (`DEFAULT_MODEL`, `src/main/config.ts`), hem CLI hem API. Faz 2'de Sonnet 5 ile karşılaştırıldı (`scripts/model-compare.mts`): ikisi de 6/6 geçerli öneri; Opus 5.5 toplamda 84 sn / $0,31, Sonnet 5 139 sn / $0,31; Opus 5.5'in haberleri daha sıkı ve kökenli, Sonnet 5 bir cevapta İngilizce kelime kaçırdı. Effort: emir okuma `low`, dünya `medium`, haber `low`. Kullanıcı istemeden model değiştirme.
 - **LLM dünyayı doğrudan değiştirmez:** ChangeList önerir, hakem onaylar, `applyTurn` uygular. Bar, etki büyüklüğü, bütçe, zar ve seçim tarihi daima koddan gelir. Claude'un rolü üç: önerici, anlatıcı, diğer ülkelerin aklı. Ne zaman olacağına (tohum patlaması, hangi ülkenin sahneye çıkacağı) kod karar verir, ne olacağına Claude.
 - **Hafıza SQLite'ta:** LLM'e her tur sadece özet + son N olay + ilgili tohumlar gider (`LIMITS`). Tarih asla prompt'ta birikmez.
-- **Harita performansı:** sadece il (admin-1), ilçe asla yok. Şehirler scalerank + zoom ile kademeli. Renk/sahiplik değişimi feature-state ile (karo yeniden inmez). Harita verisi küçük kalır (şu an 17,9 MB).
+- **Harita performansı:** sadece il (admin-1), ilçe asla yok. Şehirler scalerank + zoom ile kademeli. Renk/sahiplik değişimi feature-state ile (karo yeniden inmez). Harita verisi küçük kalır (şu an 24,6 MB). HUD panellerinde `backdrop-filter` yok (hareket eden haritanın üstünde kare yer).
 
 ## Doğrulama (her değişiklikten sonra)
 
@@ -67,7 +70,8 @@ npm run typecheck && npm test && npm run build
 npm run kanit                                            # Faz 0.5 sözleşme kanıtı (metin raporu)
 npm run kanit:faz2                                       # Faz 2 kanıtı, gerçek Claude (abonelik harcar)
 npm run playtest                                         # denge tablosu (bot başına 200 oyun)
-npm run map:build && npm run map:verify                  # harita karoları (tippecanoe gerekir), boyut + sha256 kontrolü
+npm run map:verify                                       # paketteki harita dosyaları manifest ile aynı mı (Node yeter)
+xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita   # zoom kademeleri, FPS, bellek (test-results/harita/)
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run smoke   # Linux; Mac'te sadece: npm run smoke
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli   # 20 tur, her tur ekran görüntüsü
 ```

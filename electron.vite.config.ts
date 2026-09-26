@@ -13,6 +13,8 @@ export default defineConfig({
   },
   renderer: {
     resolve: { alias: shared },
-    plugins: [react()]
+    plugins: [react()],
+    // MapLibre starts its worker as an ES module.
+    worker: { format: 'es' }
   }
 })

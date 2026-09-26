@@ -13,6 +13,8 @@ const shot = (page, name) => page.screenshot({ path: join(outDir, name) })
 const args = ['.']
 // Chromium refuses to run as root without this; only relevant in CI containers.
 if (process.platform === 'linux' && process.getuid?.() === 0) args.push('--no-sandbox')
+// Headless Linux has no GPU: draw the map's WebGL in software. Real machines use their GPU.
+if (process.platform === 'linux') args.push('--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader')
 
 const app = await electron.launch({
   args,
@@ -45,10 +47,13 @@ try {
   await page.fill('#order', 'Vergileri indir')
   await page.keyboard.press('Enter')
   await page.waitForSelector('.pending__item')
+  // Ready-made decisions live in a drawer over the map.
+  await page.click('.btn--deck')
   const trade = page.locator('.card', { has: page.locator('.card__title', { hasText: 'Ticaret anlaşması' }) })
   await trade.locator('select').selectOption({ label: 'Yunanistan' })
   await trade.getByRole('button', { name: 'Karar ver' }).click()
   await page.waitForFunction(() => document.querySelectorAll('.pending__item').length === 2)
+  await page.click('.deck__close')
   expect((await page.textContent('.command__capital'))?.startsWith('1/3'), 'iki karar iki sermaye harcamalı')
   await shot(page, '02-plan.png')
 

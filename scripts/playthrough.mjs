@@ -15,6 +15,8 @@ mkdirSync(outDir, { recursive: true })
 
 const launchArgs = ['.']
 if (process.platform === 'linux' && process.getuid?.() === 0) launchArgs.push('--no-sandbox')
+// Headless Linux has no GPU: draw the map's WebGL in software. Real machines use their GPU.
+if (process.platform === 'linux') launchArgs.push('--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader')
 const app = await electron.launch({
   args: launchArgs,
   env: {
@@ -53,6 +55,8 @@ try {
     say(`  emir: "${text}" → ${reply?.replace(/^Danışman/, '').trim()}`)
   }
   const card = async (label, target) => {
+    // Ready-made decisions live in a drawer over the map.
+    if ((await page.locator('.deck').count()) === 0) await page.click('.btn--deck')
     const el = page.locator('.card', { has: page.locator('.card__title', { hasText: label }) })
     if (target) await el.locator('select').selectOption({ label: target })
     await el.getByRole('button', { name: /Karar ver|Bir tane daha/ }).click()
@@ -112,6 +116,7 @@ try {
     if (v.status !== 'playing') break
     say(`\nTur ${v.turn + 1} planı — anket %${v.player.bars[0].value}, seçime ${v.player.election.turnsLeft} ay, darbe riski %${Math.round(v.player.coupRisk * 100)}`)
     await play(v)
+    if ((await page.locator('.deck').count()) > 0) await page.click('.deck__close')
     v = await view()
     const n = String(v.turn + 1).padStart(2, '0')
     await shot(`${n}a-plan.png`)

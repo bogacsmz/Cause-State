@@ -1,103 +1,298 @@
 {
-  "file": "map/dist/world.pmtiles",
-  "bytes": 18713299,
-  "mb": 17.85,
-  "sha256": "c639ec6dbfa6c6e81dee080d273cd6c1eedae6554218a4eb596b2855125e196f",
-  "builtWith": "tippecanoe v2.49.0",
-  "source": "Natural Earth 5.1.2 (public domain), map/sources.json",
-  "zoom": {
-    "min": 0,
-    "max": 8,
-    "overzoom": true
-  },
-  "lod": {
-    "provinces": 4,
-    "provinceLabels": 5,
-    "capitals": 3,
-    "cityByScalerank": [
-      [
-        2,
-        4
-      ],
-      [
-        4,
-        5
-      ],
-      [
-        6,
-        6
-      ],
-      [
-        7,
-        7
-      ],
-      [
-        10,
-        8
-      ]
-    ]
-  },
-  "features": {
-    "countries": 258,
-    "country_labels": 258,
-    "provinces": 4596,
-    "province_labels": 4596,
-    "cities": 7342
-  },
-  "tiles": [
-    {
-      "z": 0,
-      "tiles": 1,
-      "kb": 64,
-      "maxTileKb": 63.8
+  "files": {
+    "resources/map/fonts/Noto Sans Italic/0-255.pbf": {
+      "section": "fonts",
+      "bytes": 79344,
+      "sha256": "43edfca91c285ba1226f09d5e74d68e1473a088c517f02a5212ff6ccb10037dc"
     },
-    {
-      "z": 1,
-      "tiles": 4,
-      "kb": 124,
-      "maxTileKb": 48.3
+    "resources/map/fonts/Noto Sans Italic/256-511.pbf": {
+      "section": "fonts",
+      "bytes": 132976,
+      "sha256": "a6f9f6574c86a4a28aba630ca1017857ceadd2370ed32a1293c35f819ab9bd60"
     },
-    {
-      "z": 2,
-      "tiles": 16,
-      "kb": 214,
-      "maxTileKb": 41.7
+    "resources/map/fonts/Noto Sans Italic/512-767.pbf": {
+      "section": "fonts",
+      "bytes": 96460,
+      "sha256": "5849298255f12639422a8b8ef32927b1ac49d59f725afaa6cbaf51550a5752fe"
     },
-    {
-      "z": 3,
-      "tiles": 61,
-      "kb": 349,
-      "maxTileKb": 30.4
+    "resources/map/fonts/Noto Sans Italic/7680-7935.pbf": {
+      "section": "fonts",
+      "bytes": 141117,
+      "sha256": "781d61c4e6c2634d704579906c71b064c4b62d7da7f06141a2babc0870c05ebb"
     },
-    {
-      "z": 4,
-      "tiles": 216,
-      "kb": 1316,
-      "maxTileKb": 112.4
+    "resources/map/fonts/Noto Sans Italic/8192-8447.pbf": {
+      "section": "fonts",
+      "bytes": 52891,
+      "sha256": "5dc4e6680116fef01be024e272859d130262613c7e634409a590e5d50ad124ae"
     },
-    {
-      "z": 5,
-      "tiles": 695,
-      "kb": 1951,
-      "maxTileKb": 79.1
+    "resources/map/fonts/Noto Sans Medium/0-255.pbf": {
+      "section": "fonts",
+      "bytes": 77628,
+      "sha256": "ba2f0118dd024e3041b158e5f9eb49bc0a658019f53f458e9f5c0b8efcd79b91"
     },
-    {
-      "z": 6,
-      "tiles": 2316,
-      "kb": 2903,
-      "maxTileKb": 32.8
+    "resources/map/fonts/Noto Sans Medium/256-511.pbf": {
+      "section": "fonts",
+      "bytes": 129635,
+      "sha256": "d5e801a1a5b1d409d3298c3a1e1ca76328e2314a751078833a618620e8e66e4d"
     },
-    {
-      "z": 7,
-      "tiles": 8043,
-      "kb": 4884,
-      "maxTileKb": 23.8
+    "resources/map/fonts/Noto Sans Medium/512-767.pbf": {
+      "section": "fonts",
+      "bytes": 96169,
+      "sha256": "985e56060887a8e774fdf62ec4619f26bd44d264fcb837d315023f87d768f8e2"
     },
-    {
-      "z": 8,
-      "tiles": 29225,
-      "kb": 9905,
-      "maxTileKb": 9.9
+    "resources/map/fonts/Noto Sans Medium/7680-7935.pbf": {
+      "section": "fonts",
+      "bytes": 138316,
+      "sha256": "21c35a285f8abc65e05bd55e80f8782d10a179831a83b31d983aa00a783a258b"
+    },
+    "resources/map/fonts/Noto Sans Medium/8192-8447.pbf": {
+      "section": "fonts",
+      "bytes": 65101,
+      "sha256": "cc38e4956207f0edba1aaf749b61e8f6f1678ef1ad443d32ee285b21d0eb67aa"
+    },
+    "resources/map/fonts/Noto Sans Regular/0-255.pbf": {
+      "section": "fonts",
+      "bytes": 76044,
+      "sha256": "62c6d49b15fa836eb6aa45e259c7ca6762f44b011b09e47776efbe4a6db1b397"
+    },
+    "resources/map/fonts/Noto Sans Regular/256-511.pbf": {
+      "section": "fonts",
+      "bytes": 127726,
+      "sha256": "2eca7561f9f566bcacfda5dd04fb5880baec1328ec0f5484678289a13994de8a"
+    },
+    "resources/map/fonts/Noto Sans Regular/512-767.pbf": {
+      "section": "fonts",
+      "bytes": 94728,
+      "sha256": "6abc80badad0e823e228ab739515be257c8b33bc68bb077dd873030e9b2d143a"
+    },
+    "resources/map/fonts/Noto Sans Regular/7680-7935.pbf": {
+      "section": "fonts",
+      "bytes": 135449,
+      "sha256": "b9100ec886dff647198802c41d1ca6df9e6f82325179d8d71e3d377b5fe8682e"
+    },
+    "resources/map/fonts/Noto Sans Regular/8192-8447.pbf": {
+      "section": "fonts",
+      "bytes": 64220,
+      "sha256": "8ea977a587352fe31b4159ffdbc9a40be79056f2472017c742ea1e4a931864b9"
+    },
+    "resources/map/physical.pmtiles": {
+      "section": "vector",
+      "bytes": 3697158,
+      "sha256": "60aab506584c7544bcb7bfeee41f2c0c02f963c019716160eaf8c0565fab8af4"
+    },
+    "resources/map/relief.pmtiles": {
+      "section": "relief",
+      "bytes": 1828207,
+      "sha256": "253d36dddc57b230019d9e8b6d5beae00e37bd851380a2329fcdf4855c3e7b32"
+    },
+    "resources/map/world.pmtiles": {
+      "section": "vector",
+      "bytes": 18713317,
+      "sha256": "149bf43a1f46ad822bbec71c33ab0bf41b7856ea3fd37b28b062ad4841809dc3"
     }
-  ]
+  },
+  "vector": {
+    "source": "Natural Earth 5.1.2 (public domain), map/sources.json",
+    "builtWith": "tippecanoe v2.49.0",
+    "zoom": {
+      "world": 8,
+      "physical": 6,
+      "overzoom": true
+    },
+    "lod": {
+      "provinces": 4,
+      "provinceLabels": 5,
+      "capitals": 3,
+      "cityByScalerank": [
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          10,
+          8
+        ]
+      ],
+      "depthMaxZoom": 5,
+      "lakeMaxScalerank": 7,
+      "riverMaxScalerank": 8
+    },
+    "features": {
+      "depth": 2447,
+      "countries": 258,
+      "lakes": 711,
+      "rivers": 1219,
+      "provinces": 4596,
+      "country_labels": 258,
+      "province_labels": 4596,
+      "sea_labels": 295,
+      "cities": 7342
+    },
+    "tiles": {
+      "world": [
+        {
+          "z": 0,
+          "tiles": 1,
+          "kb": 64,
+          "maxTileKb": 63.8
+        },
+        {
+          "z": 1,
+          "tiles": 4,
+          "kb": 124,
+          "maxTileKb": 48.3
+        },
+        {
+          "z": 2,
+          "tiles": 16,
+          "kb": 214,
+          "maxTileKb": 41.7
+        },
+        {
+          "z": 3,
+          "tiles": 61,
+          "kb": 349,
+          "maxTileKb": 30.4
+        },
+        {
+          "z": 4,
+          "tiles": 216,
+          "kb": 1316,
+          "maxTileKb": 112.4
+        },
+        {
+          "z": 5,
+          "tiles": 695,
+          "kb": 1951,
+          "maxTileKb": 79.1
+        },
+        {
+          "z": 6,
+          "tiles": 2316,
+          "kb": 2903,
+          "maxTileKb": 32.8
+        },
+        {
+          "z": 7,
+          "tiles": 8043,
+          "kb": 4884,
+          "maxTileKb": 23.8
+        },
+        {
+          "z": 8,
+          "tiles": 29225,
+          "kb": 9905,
+          "maxTileKb": 9.9
+        }
+      ],
+      "physical": [
+        {
+          "z": 0,
+          "tiles": 1,
+          "kb": 117,
+          "maxTileKb": 116.8
+        },
+        {
+          "z": 1,
+          "tiles": 4,
+          "kb": 190,
+          "maxTileKb": 61.8
+        },
+        {
+          "z": 2,
+          "tiles": 16,
+          "kb": 287,
+          "maxTileKb": 46
+        },
+        {
+          "z": 3,
+          "tiles": 56,
+          "kb": 458,
+          "maxTileKb": 24.9
+        },
+        {
+          "z": 4,
+          "tiles": 215,
+          "kb": 768,
+          "maxTileKb": 12.4
+        },
+        {
+          "z": 5,
+          "tiles": 824,
+          "kb": 1274,
+          "maxTileKb": 7.9
+        },
+        {
+          "z": 6,
+          "tiles": 888,
+          "kb": 511,
+          "maxTileKb": 4
+        }
+      ]
+    }
+  },
+  "relief": {
+    "source": "Natural Earth SR_50M shaded relief (public domain), map/sources.json",
+    "tileSize": 512,
+    "format": "webp",
+    "zoom": {
+      "min": 0,
+      "max": 4,
+      "overzoom": true
+    },
+    "flatValue": 206,
+    "deadZone": 5,
+    "tiles": [
+      {
+        "z": 0,
+        "tiles": 1,
+        "kb": 6
+      },
+      {
+        "z": 1,
+        "tiles": 4,
+        "kb": 23
+      },
+      {
+        "z": 2,
+        "tiles": 16,
+        "kb": 89
+      },
+      {
+        "z": 3,
+        "tiles": 61,
+        "kb": 348
+      },
+      {
+        "z": 4,
+        "tiles": 200,
+        "kb": 1318
+      }
+    ],
+    "readBack": {
+      "tileType": 4,
+      "addressed": 282,
+      "contents": 282
+    }
+  },
+  "fonts": {
+    "source": "Noto Sans glyphs (SIL Open Font License) from protomaps/basemaps-assets, map/sources.json",
+    "stacks": [
+      "Noto Sans Italic",
+      "Noto Sans Medium",
+      "Noto Sans Regular"
+    ]
+  }
 }

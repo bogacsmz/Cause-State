@@ -29,10 +29,11 @@ npm run dev
 
 ## Nasıl oynanır
 
-- **Ortada devlet masası:** anket ve seçim sayacı, barlar, yürürlükteki etkiler. Bir bara tıklarsan bu ay neden değiştiğini görürsün.
+- **Harita:** bütün pencere dünya haritası; paneller üstünde yüzer. Sürükle, tekerlekle yakınlaştır: uzaktan ülkeler, yaklaştıkça başkentler, iller ve şehirler belirir. Harita oyunla birlikte gelir, internet istemez. F2 haritanın bu bilgisayarda kaç FPS döndüğünü gösterir.
+- **Solda devlet paneli:** anket ve seçim sayacı, barlar, yürürlükteki etkiler. Bir bara tıklarsan bu ay neden değiştiğini görürsün.
 - **Emir kutusu (asıl oyun):** ne istersen kendi cümlenle yaz: "Suriye sınırına asker yığ ve Rusya ile gizli görüşme ayarla", "Enflasyonla mücadele et ama dar gelirliyi ezme". Kabinenin cevabı sağda akarak gelir; kararlar alttaki çiplere eklenir, istersen geri alırsın. Hakemin reddettiği bir şey olursa üstü çizili olarak ve nedeniyle görünür.
 - **Soru sormak bedava:** "Durum nedir?", "Seçimi kazanır mıyız?", "Vergileri indirsem ne olur?". Konuşulan hamlelerin gerçek rakamları cevabın altında görünür.
-- **Hazır kararlar:** kartlar kısayoldur; her kart ne yaptığını ve bedelini rakamla gösterir.
+- **Hazır kararlar:** emir çubuğundaki düğmeyle açılır. Kartlar kısayoldur; her kart ne yaptığını ve bedelini rakamla gösterir.
 - **Turu bitir** (Ctrl+Enter): Claude dünyayı oynar, hakem kontrol eder, kod uygular, haber brifinge akarak yazılır. Sonra tur sonu raporu açılır; geri dönen bir karar varsa en üstte "Kelebek etkisi" olarak görünür.
 - **Sağda brifing:** her ayın manşeti, geri dönen kararlar, diğer ülkelerin hamleleri ve kabineyle konuşmaların.
 
@@ -84,8 +85,9 @@ Abonelik yolunda oyun şunlara dikkat eder:
 | `npm run kanit:faz2` | Faz 2 kanıtı, gerçek Claude ile: yaratıcı ve absürt emir, bedava soru, dış hamle, çeşitlilik, kelebek, tur 5/50/500 bağlam boyutu (`test-results/faz2/`) |
 | `npm run record:claude` | Testlerin kullandığı gerçek Claude cevaplarını yeniden kaydeder (`tests/fixtures/claude/`) |
 | `npm run db:generate` | Kayıt şeması değişince SQL göçünü üretir |
-| `npm run map:build` | Harita karolarını üretir: Natural Earth ülke/il/şehir → `map/dist/world.pmtiles` (~18 MB, git'e girmez). `tippecanoe` gerekir: `brew install tippecanoe` |
-| `npm run map:verify` | Harita dosyasının boyutunu ve sha256'sını `map/manifest.json` ile karşılaştırır |
+| `npm run map:verify` | Paketteki harita dosyalarının (`resources/map/`) boyutunu ve sha256'sını `map/manifest.json` ile karşılaştırır |
+| `npm run kanit:harita` | Derlenmiş uygulamada haritayı gezer: her zoom kademesinin ekran görüntüsü, kaydırma/zoom FPS'i, 60 uçuşta bellek (`test-results/harita/`) |
+| `npm run map:build` | Sadece geliştirici için: harita dosyalarını Natural Earth'ten yeniden üretir. Oyunu çalıştırmak için gerekmez. `tippecanoe` ister: `brew install tippecanoe` |
 
 Testler canlı Claude çağırmaz: gerçek Claude cevapları kaydedilmiştir ve testler onları oynatır. Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
 
@@ -107,7 +109,8 @@ src/preload/      Arayüz ile ana süreç arasındaki tek, güvenli köprü (win
 src/renderer/     Arayüz (React): devlet masası, karar kartları, brifing, emir satırı, tur raporu
 src/shared/       İki tarafın ortak kullandığı tipler ve kanal adları
 drizzle/          Kayıt şemasının SQL göçleri (üretilir)
-map/              Harita veri hattı: Natural Earth → PMTiles betiği, kaynak/çıktı checksum'ları, kimlik dizini
+resources/map/    Harita: ülke/il/şehir karoları, deniz-göl-nehir, kabartma, etiket fontları (oyunla birlikte gelir)
+map/              Harita dosyalarını yeniden üreten betikler, kaynak/çıktı checksum'ları, kimlik dizini
 tests/            Testler
 scripts/          Smoke testi, oyun oynatıcılar (kurallı ve gerçek Claude), denge testi, model karşılaştırması, kanıtlar, göç gömücü ve ikon üretici
 build/            Uygulama ikonu

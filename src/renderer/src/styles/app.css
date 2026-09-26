@@ -45,43 +45,143 @@ textarea {
 
 /* ── Layout ─────────────────────────────────────────────── */
 
+/* The world map fills the window; every panel floats over it (the HUD). The map never
+   shrinks. Panel sizes come from App.tsx (--hud-*), which gives the same numbers to the
+   map's camera padding. No backdrop blur: blurring over a moving map costs frames. */
 .app {
+  position: relative;
   height: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  grid-template-rows: 52px minmax(0, 1fr) auto;
-  grid-template-areas:
-    'top top'
-    'desk brief'
-    'cmd brief';
-}
-
-.app--loading {
-  grid-template-rows: 52px 1fr;
-  grid-template-areas:
-    'top top'
-    'desk desk';
+  overflow: hidden;
+  background: var(--ink-0);
 }
 
 .loading {
-  grid-area: desk;
-  place-self: center;
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 22px;
+  border-radius: 8px;
+  background: rgb(10 14 18 / 0.85);
   font-family: var(--font-serif);
   font-size: 19px;
   font-style: italic;
   color: var(--paper-2);
 }
 
+.hud-panel {
+  border: 1px solid rgb(45 57 69 / 0.85);
+  border-radius: 10px;
+  background: rgb(13 18 23 / 0.9);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+
+.hud-center {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  bottom: var(--hud-gap);
+  left: calc(2 * var(--hud-gap) + var(--hud-left));
+  right: calc(2 * var(--hud-gap) + var(--hud-right));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--hud-gap);
+  /* The open middle belongs to the map. */
+  pointer-events: none;
+}
+
+.hud-center > * {
+  pointer-events: auto;
+}
+
+/* ── World map ──────────────────────────────────────────── */
+
+.world {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #172631;
+}
+
+/* MapLibre's own CSS makes its container position: relative; keep it filling the window. */
+.world__canvas,
+.world__canvas.maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+.world__error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 16px;
+  border: 1px solid var(--err);
+  border-radius: 6px;
+  background: var(--ink-1);
+  color: var(--paper-2);
+}
+
+/* The attribution sits at the top of the open middle, clear of every panel. */
+.world .maplibregl-ctrl-bottom-right {
+  top: calc(var(--hud-top) + var(--hud-gap));
+  bottom: auto;
+  right: calc(2 * var(--hud-gap) + var(--hud-right));
+}
+
+.world .maplibregl-ctrl-attrib {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgb(10 14 18 / 0.6);
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.perf {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  left: calc(2 * var(--hud-gap) + var(--hud-left));
+  padding: 5px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgb(10 14 18 / 0.85);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--paper-2);
+}
+
+.perf strong {
+  color: var(--brass-hi);
+  font-weight: 500;
+}
+
+.perf__hint {
+  margin-left: 6px;
+  color: var(--faint);
+}
+
+.world .maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}
+
 /* ── Top bar ────────────────────────────────────────────── */
 
 .topbar {
-  grid-area: top;
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--hud-top);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 0 16px;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(to bottom, var(--ink-1), var(--ink-0));
+  border-bottom: 1px solid rgb(33 43 53 / 0.85);
+  background: linear-gradient(to bottom, rgb(10 14 18 / 0.95), rgb(10 14 18 / 0.8));
   -webkit-app-region: drag;
 }
 
@@ -276,15 +376,7 @@ textarea {
   color: var(--faint);
 }
 
-/* ── Desk ───────────────────────────────────────────────── */
-
-.desk {
-  grid-area: desk;
-  display: grid;
-  grid-template-columns: 350px minmax(0, 1fr);
-  min-height: 0;
-  background: radial-gradient(ellipse 80% 70% at 60% 30%, #0f171e 0%, var(--ink-0) 75%);
-}
+/* ── Panels ─────────────────────────────────────────────── */
 
 .nation,
 .deck {
@@ -302,18 +394,23 @@ textarea {
 .deck::-webkit-scrollbar-thumb,
 .briefing__list::-webkit-scrollbar-thumb {
   background: var(--line-strong);
-  border: 3px solid var(--ink-0);
+  border: 3px solid rgb(13 18 23);
   border-radius: 10px;
 }
 
 /* ── Nation panel ───────────────────────────────────────── */
 
 .nation {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  bottom: var(--hud-gap);
+  left: var(--hud-gap);
+  width: var(--hud-left);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 20px 28px;
-  border-right: 1px solid var(--line);
+  padding: 18px 18px 24px;
 }
 
 .nation__head {
@@ -673,18 +770,49 @@ textarea {
 
 /* ── Decision deck ──────────────────────────────────────── */
 
+/* A drawer over the map, above the command bar. */
 .deck {
-  padding: 20px 22px 28px;
+  flex: 0 1 auto;
+  max-height: 100%;
+  padding: 18px 20px 22px;
+  animation: enter 0.18s var(--ease);
 }
 
 .deck__head {
   position: sticky;
-  top: -20px;
+  top: -18px;
   z-index: 1;
-  margin: -20px -22px 14px;
-  padding: 20px 22px 12px;
+  margin: -18px -20px 14px;
+  padding: 18px 20px 12px;
   border-bottom: 1px solid var(--line);
-  background: var(--ink-0);
+  border-radius: 10px 10px 0 0;
+  background: rgb(13 18 23);
+}
+
+.deck__close {
+  margin-left: auto;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.deck__close:hover {
+  color: var(--paper);
+}
+
+.btn--deck {
+  padding: 4px 11px;
+  font-size: 12px;
+}
+
+.btn--on {
+  border-color: var(--brass-lo);
+  background: var(--brass-glow);
+  color: var(--brass-hi);
 }
 
 .tabs {
@@ -847,13 +975,11 @@ textarea {
 /* ── Command bar ────────────────────────────────────────── */
 
 .command {
-  grid-area: cmd;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 20px 14px;
-  border-top: 1px solid var(--line);
-  background: var(--ink-1);
+  padding: 12px 16px 14px;
 }
 
 .command__plan {
@@ -1061,12 +1187,16 @@ kbd {
 /* ── Briefing panel ─────────────────────────────────────── */
 
 .briefing {
-  grid-area: brief;
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  bottom: var(--hud-gap);
+  right: var(--hud-gap);
+  width: var(--hud-right);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--line);
-  background: var(--ink-1);
+  overflow: hidden;
 }
 
 .panel-head {

@@ -42,7 +42,7 @@ export function BriefingPanel({ view, liveChat, liveTurn }: Props): React.JSX.El
   }, [lastKey])
 
   return (
-    <aside className="briefing" aria-label="Brifing">
+    <aside className="briefing hud-panel" aria-label="Brifing">
       <header className="panel-head">
         <span className="eyebrow">Brifing</span>
         <span className="panel-head__meta">haberler ve danışman</span>

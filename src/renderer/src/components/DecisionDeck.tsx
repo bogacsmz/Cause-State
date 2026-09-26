@@ -8,9 +8,11 @@ interface Props {
   view: GameView
   busy: boolean
   onPick: (option: DecisionOption, target: EntityRef) => void
+  onClose: () => void
 }
 
-export function DecisionDeck({ view, busy, onPick }: Props): React.JSX.Element {
+/** Ready-made decisions: shortcuts to the referee. A drawer over the map, opened from the command bar. */
+export function DecisionDeck({ view, busy, onPick, onClose }: Props): React.JSX.Element {
   const categories = useMemo(() => {
     const seen = new Map<EffectCategory, string>()
     for (const o of view.options) if (!seen.has(o.category)) seen.set(o.category, o.categoryLabel)
@@ -21,11 +23,14 @@ export function DecisionDeck({ view, busy, onPick }: Props): React.JSX.Element {
   const playing = view.status === 'playing'
 
   return (
-    <section className="deck" aria-label="Kararlar">
+    <section className="deck hud-panel" aria-label="Kararlar">
       <div className="deck__head">
         <div className="section-head">
           <span className="eyebrow">Hazır kararlar</span>
           <span className="section-head__meta">kısayol · asıl oyun aşağıdaki emir kutusunda</span>
+          <button type="button" className="deck__close" onClick={onClose} aria-label="Hazır kararları kapat">
+            ×
+          </button>
         </div>
         <div className="tabs" role="tablist">
           <Tab active={tab === 'all'} onClick={() => setTab('all')}>

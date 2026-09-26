@@ -43,6 +43,8 @@ const SCRIPT = [
 const saveDir = mkdtempSync(join(tmpdir(), 'cs-oyun-claude-'))
 const launchArgs = ['.']
 if (process.platform === 'linux' && process.getuid?.() === 0) launchArgs.push('--no-sandbox')
+// Headless Linux has no GPU: draw the map's WebGL in software. Real machines use their GPU.
+if (process.platform === 'linux') launchArgs.push('--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader')
 const app = await electron.launch({
   args: launchArgs,
   env: { ...process.env, CS_AI_PROVIDER: 'cli', CS_SAVE_DIR: saveDir, CS_GAME_SEED: args.seed ?? '11', CS_GAME_ID: args.id ?? 'claude-20-tur' }

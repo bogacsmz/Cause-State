@@ -11,7 +11,7 @@ export function NationPanel({ view }: { view: GameView }): React.JSX.Element {
   const approval = byId.get('approval')
 
   return (
-    <section className="nation" aria-label={player.name}>
+    <section className="nation hud-panel" aria-label={player.name}>
       <header className="nation__head">
         <div>
           <span className="eyebrow">Hükümet</span>

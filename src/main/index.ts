@@ -8,10 +8,20 @@ import { ClaudeBrain, ScriptedBrain } from './game/claude/brain'
 import { registerGameIpc } from './game/ipc'
 import { GameSession } from './game/session'
 import { registerAiIpc } from './ipc'
+import { registerMapScheme, serveMap } from './map/protocol'
 
 const APP_BACKGROUND = '#0b0f13'
 
 app.setName('Cause & State')
+// The map's tiles and fonts are served from inside the app (cs-map://); this must be declared before ready.
+registerMapScheme()
+// Machines without a usable GPU (virtual machines, headless CI): CS_SOFTWARE_GL=1 draws the
+// map's WebGL in software. Real machines use their GPU and never need it.
+if (process.env.CS_SOFTWARE_GL === '1') {
+  app.commandLine.appendSwitch('ignore-gpu-blocklist')
+  app.commandLine.appendSwitch('use-angle', 'swiftshader')
+  app.commandLine.appendSwitch('enable-unsafe-swiftshader')
+}
 
 // One running copy only; a second launch focuses the existing window.
 if (!app.requestSingleInstanceLock()) {
@@ -54,6 +64,7 @@ async function start(): Promise<void> {
   })
   registerGameIpc(session)
   app.on('will-quit', () => session.close())
+  serveMap()
 
   createWindow()
   app.on('activate', () => {

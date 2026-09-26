@@ -7,6 +7,10 @@ files:
   - out/**
   - package.json
   - '!**/*.map'
+# The map (tiles, relief, label fonts) ships with the game: nothing to download or build.
+extraResources:
+  - from: resources/map
+    to: map
 mac:
   category: public.app-category.strategy-games
   target:
