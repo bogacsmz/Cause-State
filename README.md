@@ -90,6 +90,8 @@ Abonelik yolunda oyun şunlara dikkat eder:
 | `npm run map:verify` | Paketteki harita dosyalarının (`resources/map/`) boyutunu ve sha256'sını `map/manifest.json` ile karşılaştırır |
 | `npm run kanit:harita-renk` | Politik harita kanıtı: il sahibi oyun durumunda değişince haritanın karo indirmeden yeniden boyanması, tıklama bilgisi, katlanan paneller (`test-results/harita-renk/`) |
 | `npm run kanit:harita` | Derlenmiş uygulamada haritayı gezer: her zoom kademesinin ekran görüntüsü, kaydırma/zoom FPS'i, 60 uçuşta bellek (`test-results/harita/`) |
+| `npm run kanit:harita-komsu` | Komşuluk grafiği kanıtı: "bu il şununla komşu mu" örnekleri, Hatay'ın ve Türkiye'nin komşuları haritada (`test-results/harita-komsu/`) |
+| `npm run map:adjacency` | Sadece geliştirici için: il ve ülke kara sınırı grafiğini (`map/adjacency.json`) yeniden çıkarır; tippecanoe gerekmez |
 | `npm run map:build` | Sadece geliştirici için: harita dosyalarını Natural Earth'ten yeniden üretir. Oyunu çalıştırmak için gerekmez. `tippecanoe` ister: `brew install tippecanoe` |
 
 Testler canlı Claude çağırmaz: gerçek Claude cevapları kaydedilmiştir ve testler onları oynatır. Gerçek Claude ile tek bir bağlantı testi (birkaç yüz token harcar):
@@ -113,7 +115,7 @@ src/renderer/     Arayüz (React): devlet masası, karar kartları, brifing, emi
 src/shared/       İki tarafın ortak kullandığı tipler ve kanal adları
 drizzle/          Kayıt şemasının SQL göçleri (üretilir)
 resources/map/    Harita: ülke/il/şehir karoları, deniz-göl-nehir, kabartma, etiket fontları (oyunla birlikte gelir)
-map/              Harita dosyalarını yeniden üreten betikler, kaynak/çıktı checksum'ları, kimlik dizini
+map/              Harita dosyalarını yeniden üreten betikler, kaynak/çıktı checksum'ları, kimlik dizini, komşuluk grafiği
 tests/            Testler
 scripts/          Smoke testi, oyun oynatıcılar (kurallı ve gerçek Claude), denge testi, model karşılaştırması, kanıtlar, göç gömücü ve ikon üretici
 build/            Uygulama ikonu

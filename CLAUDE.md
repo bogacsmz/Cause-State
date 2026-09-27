@@ -7,7 +7,7 @@ Tasarım belgeleri kod reposunda değil, vault'ta durur (`bogacsmz/obsidian_vaul
 - `Tasarim-Fikirleri.md`: onaylanmış mekanikler ve elenen fikirler (elenenleri tekrar önerme)
 - `Kararlar.md`
 
-Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) sürüyor: veri hattı, tam ekran harita, politik renkler (GameState → feature-state) ve tıklama hazır; sırada komşuluk grafiği.
+Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) dört adımı bitti: veri hattı, tam ekran harita, politik renkler (GameState → feature-state) ve tıklama, komşuluk grafiği. Sırada fetih aksiyonunun motora bağlanması (kullanıcıyla birlikte açılacak).
 
 ## Mimari (kod = tek gerçek, LLM = sadece bulanık iş)
 
@@ -49,9 +49,11 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
   - Tıklama: z<5 ülke, z≥5 il seçer; `MapInfo.tsx` oyun durumundan bilgi gösterir (barlar, tutum, aranızdaki etkiler; il için sahibi ve elinde tutan). Oyunda olmayan ülke "oyunun dışında" der.
   - HUD: yan paneller ince, yarı saydam ve katlanır (tercih `localStorage`'da); kamera oyuncunun ülkesini panellerin kapatmadığı alana sığdırır (`countries.json` sınır kutusu + kamera boşluğu). Tur işlerken brifing kendiliğinden açılır.
   - Test kancası: `CS_TEST_HOOKS=1` iken ana süreçte `globalThis.__csDebug.setProvince(id, sahip, tutan)` (sadece bellekte), arayüzde `window.__csRefresh()`. Normal oyunda yok.
+  - **Komşuluk grafiği:** `map/adjacency.mjs` Natural Earth poligonlarından kara sınırlarını çıkarır (sınırlar ~330 m içinde en az 1 km birlikte gidiyorsa komşu; köşe teması ve boğaz sayılmaz). Çıktı `map/adjacency.json` (git, 300 KB): il ve ülke başına komşu → sınır km (yaklaşık, gerçeğin ~%80'i). İki il ülke sınırı aşarak değiyorsa ülkeler de komşu sayılır (tampon bölgeli Kıbrıs gibi). Sorgu: `src/shared/map/borders.ts` (`areProvincesAdjacent`, `areCountriesAdjacent`, `provinceNeighbors`, `countryNeighbors`, `borderKm`). Kural yok, sadece coğrafya; savaş/hareket mekaniği henüz yazılmadı.
+  - **Bölgesel faza bırakılanlar:** (a) il z4'ten önce karolarda olmadığı için dünya zoom'unda el değiştiren il görünmüyor; (b) altın ulusal sınır haritadaki ülke çizgisini izliyor, il el değiştirince gerçek sahipliğe göre yeniden çizilmiyor. İkisi de fetih aksiyonu bağlanırken çözülecek.
   - Kimlikler oyunla aynı: ülke = `ADM0_A3` (TUR), il = ISO 3166-2 (TR-31), yoksa NE `adm1_code`. `promoteId` ile feature id'si bunlar (feature-state için). NE'nin eski kodları `ISO_FIXES` ile düzeltilir.
   - Zoom kademesi (`LOD`, `map/build.mjs`): özellik kendi zoom'undan önceki karolarda hiç yoktur. z0–2 ülke adları, z3 başkentler, z4 iller + büyük şehirler, z5 il adları, z6–8 scalerank'a göre küçük şehirler.
-  - Yeniden üretmek (sadece geliştirici): `npm run map:build` (tippecanoe gerekir; geotiff/sharp/polylabel dev bağımlılığı). Kaynaklar `map/sources.json`'da sabit ve sha256'lı, çıktılar `map/manifest.json`'da. Aynı girdi aynı dosyayı verir. `map/places.json` oyunun kullanabileceği kimlikler (testlerde ve oturumda), `map/countries.json` ülke başına renk sırası ve sınır kutusu (arayüzde); ikisi `node map/build.mjs --data-only` ile tippecanoe'suz yazılır.
+  - Yeniden üretmek (sadece geliştirici): `npm run map:build` (karolar, kabartma, fontlar, komşuluk; tippecanoe gerekir; geotiff/sharp/polylabel dev bağımlılığı). Kaynaklar `map/sources.json`'da sabit ve sha256'lı, çıktılar `map/manifest.json`'da. Aynı girdi aynı dosyayı verir. `map/places.json` oyunun kullanabileceği kimlikler (testlerde ve oturumda), `map/countries.json` ülke başına renk sırası ve sınır kutusu (arayüzde); ikisi `node map/build.mjs --data-only` ile tippecanoe'suz yazılır.
 
 ## Değişmez kurallar
 
@@ -79,6 +81,7 @@ npm run playtest                                         # denge tablosu (bot ba
 npm run map:verify                                       # paketteki harita dosyaları manifest ile aynı mı (Node yeter)
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita   # zoom kademeleri, FPS, bellek (test-results/harita/)
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita-renk   # politik renk, GameState → recolor, tıklama, paneller
+xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita-komsu   # komşuluk grafiği: örnek sorgular + haritada komşular
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run smoke   # Linux; Mac'te sadece: npm run smoke
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli   # 20 tur, her tur ekran görüntüsü
 ```

@@ -1,5 +1,10 @@
 {
   "files": {
+    "map/adjacency.json": {
+      "section": "adjacency",
+      "bytes": 302582,
+      "sha256": "8a72699d3d0d09ec6e8015d9fc2f27418a2ba5dd1b0b18f83b53b85534e75bab"
+    },
     "resources/map/fonts/Noto Sans Italic/0-255.pbf": {
       "section": "fonts",
       "bytes": 79344,
@@ -294,5 +299,21 @@
       "Noto Sans Medium",
       "Noto Sans Regular"
     ]
+  },
+  "adjacency": {
+    "countries": {
+      "nodes": 258,
+      "borders": 343,
+      "withoutLandBorder": 83
+    },
+    "provinces": {
+      "nodes": 4596,
+      "borders": 10651,
+      "withoutLandBorder": 268
+    },
+    "rule": {
+      "toleranceDeg": 0.003,
+      "minSharedKm": 1
+    }
   }
 }

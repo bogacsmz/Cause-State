@@ -27,10 +27,12 @@
     "playthrough": "node scripts/playthrough.mjs",
     "record:claude": "tsx --tsconfig tsconfig.node.json scripts/record-claude-fixtures.mts",
     "kanit:faz2": "tsx --tsconfig tsconfig.node.json scripts/faz2-kanit.mts",
-    "map:build": "node map/build.mjs && node map/relief.mjs && node map/fonts.mjs",
+    "map:build": "node map/build.mjs && node map/relief.mjs && node map/fonts.mjs && node map/adjacency.mjs",
     "map:verify": "node map/verify.mjs",
     "kanit:harita": "node scripts/harita-kanit.mjs",
-    "kanit:harita-renk": "node scripts/harita-renk-kanit.mjs"
+    "kanit:harita-renk": "node scripts/harita-renk-kanit.mjs",
+    "map:adjacency": "node map/adjacency.mjs",
+    "kanit:harita-komsu": "node scripts/harita-komsu-kanit.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
