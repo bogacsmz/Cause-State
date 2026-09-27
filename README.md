@@ -29,7 +29,7 @@ npm run dev
 
 ## Nasıl oynanır
 
-- **Harita:** bütün pencere dünya haritası; paneller üstünde yüzer. Sürükle, tekerlekle yakınlaştır: uzaktan ülkeler, yaklaştıkça başkentler, iller ve şehirler belirir. Harita oyunla birlikte gelir, internet istemez. F2 haritanın bu bilgisayarda kaç FPS döndüğünü gösterir.
+- **Harita:** bütün pencere politik dünya haritası; senin ülken altın rengi, diğerleri ayrı renklerde. Sürükle, tekerlekle yakınlaştır: uzaktan ülkeler, yaklaştıkça başkentler, iller ve şehirler belirir. Bir ülkeye tıkla (yakından bir ile): barları, sana tutumu, aranızdaki anlaşmalar ve ilin kimde olduğu açılır. Başkasının eline geçen il onun rengine boyanır, işgaldeyse taralıdır. Yan panelleri kenarlarındaki düğmeyle katlayıp haritayı açabilirsin; "Ülkeme dön" kamerayı geri getirir. Harita oyunla birlikte gelir, internet istemez. F2 haritanın bu bilgisayarda kaç FPS döndüğünü gösterir.
 - **Solda devlet paneli:** anket ve seçim sayacı, barlar, yürürlükteki etkiler. Bir bara tıklarsan bu ay neden değiştiğini görürsün.
 - **Emir kutusu (asıl oyun):** ne istersen kendi cümlenle yaz: "Suriye sınırına asker yığ ve Rusya ile gizli görüşme ayarla", "Enflasyonla mücadele et ama dar gelirliyi ezme". Kabinenin cevabı sağda akarak gelir; kararlar alttaki çiplere eklenir, istersen geri alırsın. Hakemin reddettiği bir şey olursa üstü çizili olarak ve nedeniyle görünür.
 - **Soru sormak bedava:** "Durum nedir?", "Seçimi kazanır mıyız?", "Vergileri indirsem ne olur?". Konuşulan hamlelerin gerçek rakamları cevabın altında görünür.
@@ -88,6 +88,7 @@ Abonelik yolunda oyun şunlara dikkat eder:
 | `npm run record:claude` | Testlerin kullandığı gerçek Claude cevaplarını yeniden kaydeder (`tests/fixtures/claude/`) |
 | `npm run db:generate` | Kayıt şeması değişince SQL göçünü üretir |
 | `npm run map:verify` | Paketteki harita dosyalarının (`resources/map/`) boyutunu ve sha256'sını `map/manifest.json` ile karşılaştırır |
+| `npm run kanit:harita-renk` | Politik harita kanıtı: il sahibi oyun durumunda değişince haritanın karo indirmeden yeniden boyanması, tıklama bilgisi, katlanan paneller (`test-results/harita-renk/`) |
 | `npm run kanit:harita` | Derlenmiş uygulamada haritayı gezer: her zoom kademesinin ekran görüntüsü, kaydırma/zoom FPS'i, 60 uçuşta bellek (`test-results/harita/`) |
 | `npm run map:build` | Sadece geliştirici için: harita dosyalarını Natural Earth'ten yeniden üretir. Oyunu çalıştırmak için gerekmez. `tippecanoe` ister: `brew install tippecanoe` |
 

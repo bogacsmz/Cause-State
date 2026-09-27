@@ -5,7 +5,7 @@ import { lineTone, percent, prettyLine, signed } from '../lib/format'
 const CORE = ['approval', 'stability', 'economy', 'welfare'] as const
 const POWER = ['military', 'sovereignty', 'reputation'] as const
 
-export function NationPanel({ view }: { view: GameView }): React.JSX.Element {
+export function NationPanel({ view, onFold }: { view: GameView; onFold?: () => void }): React.JSX.Element {
   const { player } = view
   const byId = new Map(player.bars.map((b) => [b.id, b]))
   const approval = byId.get('approval')
@@ -18,6 +18,11 @@ export function NationPanel({ view }: { view: GameView }): React.JSX.Element {
           <h1 className="nation__name">{player.name}</h1>
         </div>
         <Capital left={player.capital.left} max={player.capital.max} />
+        {onFold && (
+          <button type="button" className="fold fold--left" onClick={onFold} aria-label="Paneli katla" title="Paneli katla">
+            ‹
+          </button>
+        )}
       </header>
 
       {approval && <ElectionCard view={view} approval={approval.value} />}

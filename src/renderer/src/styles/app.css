@@ -70,11 +70,66 @@ textarea {
   color: var(--paper-2);
 }
 
+/* Slightly see-through, so the map breathes behind the panels. */
 .hud-panel {
-  border: 1px solid rgb(45 57 69 / 0.85);
+  border: 1px solid rgb(58 72 86 / 0.7);
   border-radius: 10px;
-  background: rgb(13 18 23 / 0.9);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  background: rgb(12 17 22 / 0.8);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+}
+
+/* Folding a side panel: the button in its header, and the tab that brings it back. */
+.fold {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: rgb(10 14 18 / 0.6);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fold:hover {
+  border-color: var(--brass-lo);
+  color: var(--brass-hi);
+}
+
+.fold--left {
+  align-self: flex-start;
+  margin-left: 8px;
+}
+
+.hud-tab {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  padding: 7px 12px;
+  border: 1px solid rgb(58 72 86 / 0.7);
+  border-radius: 8px;
+  background: rgb(12 17 22 / 0.85);
+  color: var(--paper-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hud-tab:hover {
+  border-color: var(--brass-lo);
+  color: var(--brass-hi);
+}
+
+.hud-tab--left {
+  left: var(--hud-gap);
+}
+
+.hud-tab--right {
+  right: var(--hud-gap);
 }
 
 .hud-center {
@@ -124,11 +179,209 @@ textarea {
   color: var(--paper-2);
 }
 
-/* The attribution sits at the top of the open middle, clear of every panel. */
+/* Map controls sit at the bottom right of the open middle, just above the command bar,
+   clear of the panels and of the tabs of folded panels. */
 .world .maplibregl-ctrl-bottom-right {
-  top: calc(var(--hud-top) + var(--hud-gap));
-  bottom: auto;
+  bottom: calc(var(--hud-bottom) + 2 * var(--hud-gap));
   right: calc(2 * var(--hud-gap) + var(--hud-right));
+}
+
+.world__home {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(var(--hud-bottom) + 2 * var(--hud-gap) + 26px);
+  right: calc(2 * var(--hud-gap) + var(--hud-right));
+  padding: 6px 12px;
+  border: 1px solid rgb(58 72 86 / 0.7);
+  border-radius: 6px;
+  background: rgb(12 17 22 / 0.8);
+  color: var(--paper-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.world__home:hover {
+  border-color: var(--brass-lo);
+  color: var(--brass-hi);
+}
+
+/* ── Map info (what was clicked) ───────────────────────── */
+
+.map-info {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--hud-top) + var(--hud-gap));
+  left: calc(2 * var(--hud-gap) + var(--hud-left));
+  width: 280px;
+  max-height: calc(100% - var(--hud-top) - 170px);
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  animation: enter 0.16s var(--ease);
+}
+
+.map-info__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.map-info__head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--paper);
+}
+
+.map-info__swatch {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  margin-right: 6px;
+  border: 1px solid rgb(0 0 0 / 0.5);
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.map-info__head h2 .map-info__swatch {
+  width: 13px;
+  height: 13px;
+  margin-right: 0;
+}
+
+.map-info__close {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-info__close:hover {
+  color: var(--paper);
+}
+
+.map-info__kind {
+  margin: 4px 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.map-info__link {
+  padding: 0;
+  border: none;
+  border-bottom: 1px dotted var(--brass-lo);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.map-info__link:hover {
+  color: var(--brass-hi);
+}
+
+.map-info__stance {
+  margin: -4px 0 10px;
+  font-size: 12.5px;
+  color: var(--paper-2);
+}
+
+.map-info__stance b {
+  font-weight: 500;
+  color: var(--paper);
+}
+
+.map-info__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.map-info__facts dt {
+  color: var(--muted);
+}
+
+.map-info__facts dd {
+  margin: 0;
+  color: var(--paper);
+}
+
+.map-info__warn {
+  font-weight: 500;
+  color: var(--err);
+}
+
+.map-info__note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.map-info__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.map-info__bars li {
+  display: grid;
+  grid-template-columns: 82px 1fr 26px;
+  align-items: center;
+  gap: 8px;
+  color: var(--paper-2);
+}
+
+.map-info__bars b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: right;
+  color: var(--paper);
+}
+
+.map-info__meter {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.map-info__meter span {
+  display: block;
+  height: 100%;
+  background: var(--brass-lo);
+}
+
+.map-info__ties {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--paper-2);
+}
+
+.map-info__ties p {
+  margin: 5px 0 0;
 }
 
 .world .maplibregl-ctrl-attrib {
@@ -142,7 +395,7 @@ textarea {
 .perf {
   position: absolute;
   z-index: 1;
-  top: calc(var(--hud-top) + var(--hud-gap));
+  bottom: calc(var(--hud-bottom) + 2 * var(--hud-gap));
   left: calc(2 * var(--hud-gap) + var(--hud-left));
   padding: 5px 10px;
   border: 1px solid var(--line-strong);
@@ -409,8 +662,8 @@ textarea {
   width: var(--hud-left);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px 18px 24px;
+  gap: 14px;
+  padding: 16px 14px 20px;
 }
 
 .nation__head {
@@ -1238,7 +1491,7 @@ kbd {
   align-items: baseline;
   margin: 0 -16px;
   padding: 12px 16px 7px;
-  background: var(--ink-1);
+  background: rgb(12 17 22 / 0.96);
   box-shadow: 0 6px 8px -6px rgb(0 0 0 / 0.6);
   font-family: var(--font-mono);
   font-size: 10.5px;

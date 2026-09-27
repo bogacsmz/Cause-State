@@ -103,6 +103,42 @@ export interface BarView {
   causes: BarCause[]
 }
 
+/** A country the game plays, as the map's info panel shows it. */
+export interface MapCountry {
+  id: string
+  name: string
+  player: boolean
+  regimeLabel: string
+  bars: Array<{ id: BarId; label: string; value: number }>
+  /** How it treated Türkiye at the start of 2026 (the world book), in Turkish; null for the player. */
+  stance: string | null
+  /** Effects running between it and the player, e.g. "Ticaret anlaşması · 3 ay daha". */
+  ties: string[]
+}
+
+/** A province the game tracks: whose it is and who holds it. */
+export interface MapProvince {
+  id: string
+  name: string
+  /** The country it lies in on the map. */
+  home: string
+  owner: string
+  ownerName: string
+  controller: string
+  controllerName: string
+}
+
+/**
+ * The world as the map draws it, built from GameState by the game session (outside the
+ * engine: the map is a view). Countries and provinces the game does not track are drawn
+ * from the map's own data.
+ */
+export interface MapView {
+  player: string
+  countries: MapCountry[]
+  provinces: MapProvince[]
+}
+
 export interface GameView {
   gameId: string
   turn: number
@@ -136,6 +172,8 @@ export interface GameView {
   polls: Array<{ turn: number; approval: number }>
   /** Who reads the orders and plays the world, and the last thing to know about it. */
   ai: { kind: 'claude' | 'scripted'; notice: string | null }
+  /** Set by the game session: what the map colours and its info panel shows. */
+  map?: MapView
 }
 
 /** Answer to a typed order or a picked card. */

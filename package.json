@@ -29,7 +29,8 @@
     "kanit:faz2": "tsx --tsconfig tsconfig.node.json scripts/faz2-kanit.mts",
     "map:build": "node map/build.mjs && node map/relief.mjs && node map/fonts.mjs",
     "map:verify": "node map/verify.mjs",
-    "kanit:harita": "node scripts/harita-kanit.mjs"
+    "kanit:harita": "node scripts/harita-kanit.mjs",
+    "kanit:harita-renk": "node scripts/harita-renk-kanit.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

@@ -68,6 +68,12 @@ async function start(): Promise<void> {
   })
   registerGameIpc(session)
   app.on('will-quit', () => session.close())
+  // Proof scripts only: change GameState from outside, in memory (never in a normal game).
+  if (process.env.CS_TEST_HOOKS === '1') {
+    Object.assign(globalThis, {
+      __csDebug: { setProvince: (id: string, owner: string, controller: string) => session.debugSetProvince(id, owner, controller).then(() => true) }
+    })
+  }
   serveMap()
 
   createWindow()

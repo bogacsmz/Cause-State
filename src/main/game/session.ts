@@ -12,6 +12,7 @@ import { checkDecision, explainIssue } from '../../engine/referee'
 import { buildView, effectLines, type PendingDecision } from '../../engine/view'
 import { GameStore } from '../store/game-store'
 import { ScriptedBrain, type BrainCall, type BrainHooks, type Commitment, type GameBrain } from './claude/brain'
+import { buildMapView } from './map-view'
 
 /** How many past turns of news the briefing shows. */
 const FEED_TURNS = 8
@@ -176,6 +177,17 @@ export class GameSession {
     })
   }
 
+  /**
+   * Test hook (CS_TEST_HOOKS=1 only, see main/index.ts): hands a province to someone, in
+   * memory, without a turn or a save. Lets the proof scripts show the map following GameState.
+   */
+  debugSetProvince(id: string, owner: string, controller: string): Promise<GameView> {
+    return this.run(async () => {
+      this.state = { ...this.state, provinces: this.state.provinces.map((p) => (p.id === id ? { ...p, owner, controller } : p)) }
+      return this.buildView()
+    })
+  }
+
   /** The month's decisions with the reason recorded for each (cards get the catalog's wording). */
   private commitments(): Commitment[] {
     return this.pending.map((p) => ({
@@ -208,7 +220,7 @@ export class GameSession {
     const seedIds = feed.flatMap((e) => (e.kind === 'seed_fired' && e.seedId ? [e.seedId] : []))
     const seeds = await this.store.seedsByIds(seedIds)
     const history = await this.store.barHistory(this.state.playerCountryId, 'approval')
-    return buildView({
+    const view = buildView({
       state: this.state,
       feed,
       seeds,
@@ -217,6 +229,7 @@ export class GameSession {
       polls: history.map((h) => ({ turn: h.turn, approval: h.value })),
       ai: { kind: this.brain.kind, notice: this.notice }
     })
+    return { ...view, map: buildMapView(this.state) }
   }
 
   private id(prefix: string): string {

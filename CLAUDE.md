@@ -7,7 +7,7 @@ Tasarım belgeleri kod reposunda değil, vault'ta durur (`bogacsmz/obsidian_vaul
 - `Tasarim-Fikirleri.md`: onaylanmış mekanikler ve elenen fikirler (elenenleri tekrar önerme)
 - `Kararlar.md`
 
-Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) sürüyor: veri hattı ve tam ekran harita hazır; sırada GameState → renk ve komşuluk grafiği.
+Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) sürüyor: veri hattı, tam ekran harita, politik renkler (GameState → feature-state) ve tıklama hazır; sırada komşuluk grafiği.
 
 ## Mimari (kod = tek gerçek, LLM = sadece bulanık iş)
 
@@ -45,9 +45,13 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
   - **Tam paket:** harita dosyaları repoda ve uygulamanın içinde (`resources/map/`: `world.pmtiles` 17,9 MB, `physical.pmtiles` 3,5 MB, `relief.pmtiles` 1,7 MB, `fonts/` 15 glif dosyası; toplam 24,6 MB). electron-builder `extraResources` ile `.app`'in `Resources/map` klasörüne kopyalar. Temiz klonda `npm install && npm run dev` haritayı açar; dışarıya bağımlı tek şey yapay zeka.
   - `src/main/map/protocol.ts`: ana süreç dosyaları `cs-map://` üzerinden sunar (`tiles/<world|physical|relief>/{z}/{x}/{y}`, `fonts/<yığın>/<aralık>.pbf`). pmtiles kütüphanesi dosyayı diskte açık tutar, karoyu açıp verir. Başka hiçbir şey sunulmaz.
   - `src/renderer/src/map/`: MapLibre GL 6. `style.ts` katmanlar ve renkler, projeksiyon tek yerde (`MAP_PROJECTION`, şimdi `mercator`). `MapView.tsx` tam ekran tuval; eğim ve döndürme kapalı, önbellek sınırı 160 karo/kaynak, uzakta (z<3) piksel oranı 1. WebGL2 yoksa oyun haritasız sürer. `PerfOverlay.tsx`: F2 ile FPS, en uzun kare, karo ve bellek.
+  - **Politik harita, GameState'ten renk:** her ülke Natural Earth MAPCOLOR9 sırasına göre dokuz tondan birinde (komşular aynı rengi almaz, `colors.ts`); oyuncunun ülkesi altın. Oturum her görünüme `map` ekler (`src/main/game/map-view.ts`, motorun dışında: harita GameState'in görünümü). `sync.ts` bunu feature-state'e çevirir ve sadece değişene dokunur: `player` (ülke), `fill` + `occupied` (başkasının elindeki il, işgalde taralı), `selected` (tıklanan). Karo hiç yeniden inmez. Kabartma soluk arka plan.
+  - Tıklama: z<5 ülke, z≥5 il seçer; `MapInfo.tsx` oyun durumundan bilgi gösterir (barlar, tutum, aranızdaki etkiler; il için sahibi ve elinde tutan). Oyunda olmayan ülke "oyunun dışında" der.
+  - HUD: yan paneller ince, yarı saydam ve katlanır (tercih `localStorage`'da); kamera oyuncunun ülkesini panellerin kapatmadığı alana sığdırır (`countries.json` sınır kutusu + kamera boşluğu). Tur işlerken brifing kendiliğinden açılır.
+  - Test kancası: `CS_TEST_HOOKS=1` iken ana süreçte `globalThis.__csDebug.setProvince(id, sahip, tutan)` (sadece bellekte), arayüzde `window.__csRefresh()`. Normal oyunda yok.
   - Kimlikler oyunla aynı: ülke = `ADM0_A3` (TUR), il = ISO 3166-2 (TR-31), yoksa NE `adm1_code`. `promoteId` ile feature id'si bunlar (feature-state için). NE'nin eski kodları `ISO_FIXES` ile düzeltilir.
   - Zoom kademesi (`LOD`, `map/build.mjs`): özellik kendi zoom'undan önceki karolarda hiç yoktur. z0–2 ülke adları, z3 başkentler, z4 iller + büyük şehirler, z5 il adları, z6–8 scalerank'a göre küçük şehirler.
-  - Yeniden üretmek (sadece geliştirici): `npm run map:build` (tippecanoe gerekir; geotiff/sharp/polylabel dev bağımlılığı). Kaynaklar `map/sources.json`'da sabit ve sha256'lı, çıktılar `map/manifest.json`'da. Aynı girdi aynı dosyayı verir. `map/places.json` oyunun kullanabileceği kimlikler (testlerde).
+  - Yeniden üretmek (sadece geliştirici): `npm run map:build` (tippecanoe gerekir; geotiff/sharp/polylabel dev bağımlılığı). Kaynaklar `map/sources.json`'da sabit ve sha256'lı, çıktılar `map/manifest.json`'da. Aynı girdi aynı dosyayı verir. `map/places.json` oyunun kullanabileceği kimlikler (testlerde ve oturumda), `map/countries.json` ülke başına renk sırası ve sınır kutusu (arayüzde); ikisi `node map/build.mjs --data-only` ile tippecanoe'suz yazılır.
 
 ## Değişmez kurallar
 
@@ -74,6 +78,7 @@ npm run kanit:faz2                                       # Faz 2 kanıtı, gerç
 npm run playtest                                         # denge tablosu (bot başına 200 oyun)
 npm run map:verify                                       # paketteki harita dosyaları manifest ile aynı mı (Node yeter)
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita   # zoom kademeleri, FPS, bellek (test-results/harita/)
+xvfb-run -a -s "-screen 0 1600x1000x24" npm run kanit:harita-renk   # politik renk, GameState → recolor, tıklama, paneller
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run smoke   # Linux; Mac'te sadece: npm run smoke
 xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli   # 20 tur, her tur ekran görüntüsü
 ```

@@ -2,7 +2,8 @@
 // - resources/map/world.pmtiles: countries, provinces (admin-1, never districts), cities and
 //   their names, zoom 0–8 (the map overzooms past 8);
 // - resources/map/physical.pmtiles: sea depth, lakes, rivers, sea names, zoom 0–6, simpler.
-// Also writes map/places.json, the ids the game can use.
+// Also writes map/places.json (the ids the game can use) and map/countries.json (colour slot
+// and bounds per country); `node map/build.mjs --data-only` writes only these two.
 //
 //   npm run map:build     developer tool only: needs tippecanoe ≥ 2.17 (brew/apt install tippecanoe)
 //
@@ -188,9 +189,43 @@ function tileset(name, layers, maxZoom, extra) {
   return { file: relative(ROOT, out), tiles: tileStats(mbtiles) }
 }
 
+/** Bounding box [west, south, east, north] of a country's largest part (mainland USA, not Alaska). */
+function mainBounds(geometry) {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  const area = (ring) => Math.abs(ring.reduce((s, [x1, y1], i) => { const [x2, y2] = ring[(i + 1) % ring.length]; return s + x1 * y2 - x2 * y1 }, 0))
+  const ring = polygons.reduce((a, b) => (area(b[0]) > area(a[0]) ? b : a))[0]
+  const round = (v) => Math.round(v * 100) / 100
+  return [
+    round(Math.min(...ring.map((p) => p[0]))),
+    round(Math.min(...ring.map((p) => p[1]))),
+    round(Math.max(...ring.map((p) => p[0]))),
+    round(Math.max(...ring.map((p) => p[1])))
+  ]
+}
+
+/** The small data files next to the tiles (git; no tippecanoe needed): `--data-only` writes just these. */
+function writeData(all) {
+  const sorted = (entries) => Object.fromEntries(entries.sort(([a], [b]) => (a < b ? -1 : 1)))
+  // The ids the game can use: country → name, province → [country, name].
+  const places = {
+    countries: sorted(all.countries.map((f) => [f.properties.cid, f.properties.name])),
+    provinces: sorted(all.provinces.map((f) => [f.properties.pid, [f.properties.cid, f.properties.name]]))
+  }
+  writeFileSync(join(MAP, 'places.json'), JSON.stringify(places) + '\n')
+  // What the map screen needs per country: its colour slot (Natural Earth MAPCOLOR9,
+  // neighbours never share one) and the box the camera fits it into.
+  const countries = sorted(all.countries.map((f) => [f.properties.cid, { name: f.properties.name, mc: f.properties.mc, bounds: mainBounds(f.geometry) }]))
+  writeFileSync(join(MAP, 'countries.json'), JSON.stringify(countries) + '\n')
+}
+
 const started = Date.now()
-const tippecanoe = run('tippecanoe', ['--version'], 'tippecanoe (brew/apt install tippecanoe)').trim()
 const all = transform(await loadSources())
+writeData(all)
+if (process.argv.includes('--data-only')) {
+  console.log('map/places.json ve map/countries.json yazıldı')
+  process.exit(0)
+}
+const tippecanoe = run('tippecanoe', ['--version'], 'tippecanoe (brew/apt install tippecanoe)').trim()
 const pick = (keep) => Object.fromEntries(Object.entries(all).filter(([name]) => keep(name)))
 mkdirSync(ASSETS, { recursive: true })
 const world = tileset('world', pick((name) => !PHYSICAL.includes(name)), MAX_ZOOM, [])
@@ -205,14 +240,6 @@ recordBuild('vector', [world.file, physical.file], {
   features: Object.fromEntries(Object.entries(all).map(([name, f]) => [name, f.length])),
   tiles: { world: world.tiles, physical: physical.tiles }
 })
-
-// The ids the game can use, small enough for git: country → name, province → [country, name].
-const sorted = (entries) => Object.fromEntries(entries.sort(([a], [b]) => (a < b ? -1 : 1)))
-const places = {
-  countries: sorted(all.countries.map((f) => [f.properties.cid, f.properties.name])),
-  provinces: sorted(all.provinces.map((f) => [f.properties.pid, [f.properties.cid, f.properties.name]]))
-}
-writeFileSync(join(MAP, 'places.json'), JSON.stringify(places) + '\n')
 
 for (const { file, tiles } of [world, physical]) {
   console.log(`${file}: ${mb(statSync(join(ROOT, file)).size)} MB, ${tiles.reduce((n, t) => n + t.tiles, 0)} karo`)

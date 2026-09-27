@@ -28,9 +28,10 @@ interface Props {
   view: GameView
   liveChat: LiveChat | null
   liveTurn: LiveTurn | null
+  onFold?: () => void
 }
 
-export function BriefingPanel({ view, liveChat, liveTurn }: Props): React.JSX.Element {
+export function BriefingPanel({ view, liveChat, liveTurn, onFold }: Props): React.JSX.Element {
   const listRef = useRef<HTMLDivElement>(null)
   const groups = useMemo(() => groupByTurn(view), [view])
   const lastKey = `${view.turn}:${view.feed.length}:${view.chat.length}:${liveChat?.reply.length ?? -1}:${liveChat?.rejected.length ?? 0}:${liveTurn?.narration.length ?? -1}:${liveTurn?.phase ?? ''}`
@@ -46,6 +47,11 @@ export function BriefingPanel({ view, liveChat, liveTurn }: Props): React.JSX.El
       <header className="panel-head">
         <span className="eyebrow">Brifing</span>
         <span className="panel-head__meta">haberler ve danışman</span>
+        {onFold && (
+          <button type="button" className="fold fold--right" onClick={onFold} aria-label="Brifingi katla" title="Brifingi katla">
+            ›
+          </button>
+        )}
       </header>
 
       <div className="briefing__list" ref={listRef}>

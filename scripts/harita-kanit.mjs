@@ -9,6 +9,7 @@ import { _electron as electron } from 'playwright'
 
 const opts = Object.fromEntries(process.argv.slice(2).map((a) => a.split('=')))
 const dpr = Number(opts.dpr ?? 1)
+const flights = Number(opts.ucus ?? 60)
 const outDir = opts.out ?? join('test-results', 'harita')
 mkdirSync(outDir, { recursive: true })
 
@@ -175,7 +176,7 @@ try {
   say(`| Aynı uçuş, boş harita (sadece deniz rengi) | 3.0 sn | ${floor.toFixed(0)} | | |`)
 
   // ── 3. Memory over many flights ──────────────────────────────────────────
-  say('\n## Bellek: dünyanın her yerine 60 uçuş\n')
+  say(`\n## Bellek: dünyanın her yerine ${flights} uçuş\n`)
   say('| Uçuş | toplam bellek | GPU süreci | sayfa (Tab) | JS yığını |')
   say('|---|---|---|---|---|')
   const sample = async (label) => {
@@ -188,12 +189,13 @@ try {
   // A fixed pseudo-random tour, so runs are comparable.
   let seed = 7
   const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
-  for (let i = 1; i <= 60; i++) {
+  const every = Math.max(10, Math.round(flights / 6))
+  for (let i = 1; i <= flights; i++) {
     const center = [-170 + rand() * 340, -55 + rand() * 125]
     const zoom = 2 + rand() * 7
     await page.evaluate((v) => window.__csMap.jumpTo(v), { center, zoom })
     await idle()
-    if (i % 20 === 0) await sample(`${i}. uçuş`)
+    if (i % every === 0) await sample(`${i}. uçuş`)
   }
   // MapLibre internals (v6): tiles on screen plus the capped cache of recently seen ones.
   const tiles = await page.evaluate(() =>

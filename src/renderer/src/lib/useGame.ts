@@ -23,6 +23,12 @@ export interface LiveTurn {
   narration: string
 }
 
+declare global {
+  interface Window {
+    __csRefresh?: () => Promise<void>
+  }
+}
+
 /** The game as the UI sees it: the latest view from the main process, plus UI-only state. */
 export function useGame(): {
   view: GameView | null
@@ -61,6 +67,11 @@ export function useGame(): {
       .view()
       .then(setView)
       .catch((err: unknown) => setLoadError(message(err)))
+    // For the proof scripts: re-read the game after they change it in the main process.
+    window.__csRefresh = () => window.cs.game.view().then(setView)
+    return () => {
+      delete window.__csRefresh
+    }
   }, [])
 
   // Live progress from the main process: the cabinet's reply and the month's news as they stream.
