@@ -32,10 +32,17 @@ try {
   const page = await app.firstWindow()
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+  // MapLibre reports through console warnings too (a missing layer or image).
+  page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && errors.push(m.text().slice(0, 240)))
   const tileRequests = []
   page.on('request', (r) => r.url().startsWith('cs-map://tiles/') && tileRequests.push(r.url()))
   await page.setViewportSize({ width: 1440, height: 900 })
+  // A person moves the mouse over the map before it has finished loading.
+  await page.waitForSelector('.world__canvas', { timeout: 30_000 })
+  for (let i = 0; i < 40; i++) {
+    await page.mouse.move(520 + (i % 7) * 40, 240 + (i % 5) * 45)
+    await page.waitForTimeout(40)
+  }
   await page.waitForSelector('.nation', { timeout: 30_000 })
   await page.waitForFunction(() => window.__csMap?.loaded() && window.__csMap.areTilesLoaded(), null, { timeout: 60_000 })
   const idle = () =>
@@ -103,6 +110,16 @@ try {
     if (file) await shot(file)
     say(`- ${label}: "${text.slice(0, 190)}"`)
   }
+
+  // The sea and empty ground: nothing is picked, nothing breaks.
+  if (await page.$('.map-info')) await page.click('.map-info__close')
+  for (const ll of [[34, 43.2], [31, 34], [18, 37]]) {
+    const p = await page.evaluate((x) => window.__csMap.project(x), ll)
+    await page.mouse.move(p.x, p.y)
+    await page.mouse.click(p.x, p.y)
+    await page.waitForTimeout(250)
+  }
+  say(`- Denize tıklama (3 yer, önce fareyle üstünden geçerek): bilgi paneli ${(await page.$('.map-info')) ? 'AÇILDI' : 'açılmadı'}, hata ${errors.length}`)
 
   // ── 3. GameState changes hands → the map recolours, no tile loads ────────
   say('\n## Kodda il sahibi değişiyor → harita\n')

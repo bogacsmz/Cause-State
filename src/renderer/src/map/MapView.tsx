@@ -15,6 +15,8 @@ setWorkerUrl(workerUrl)
 const TILE_CACHE = 160
 /** Far out the map is a small picture of the world: render it at 1× to spare memory. */
 const LOW_DETAIL_BELOW_ZOOM = 3
+/** A map not loaded after this long is reported as broken (the files are local: it is fast). */
+const LOAD_TIMEOUT_MS = 20_000
 /** From this zoom a click picks a province rather than its country. */
 const PROVINCE_CLICK_ZOOM = 5
 /** Until the first GameView arrives. */
@@ -103,24 +105,25 @@ export function MapView({ game, padding, selection, onSelect }: Props): React.JS
     }
     m.keyboard.disableRotation()
     m.touchZoomRotate.disableRotation()
-    m.on('styleimagemissing', (e) => {
-      if (e.id === HATCH && !m.hasImage(HATCH)) m.addImage(HATCH, hatchImage())
+    // The stripes of occupied provinces are drawn here and handed over when a tile first asks.
+    m.setMissingStyleImageResolver((id) => {
+      if (id === HATCH && !m.hasImage(HATCH)) m.addImage(HATCH, hatchImage())
     })
     m.on('zoomend', () => {
       const want = pixelRatioFor(m.getZoom())
       if (want !== m.getPixelRatio()) m.setPixelRatio(want)
     })
+    // A map that never finishes loading says so; a single failed tile or query only logs.
     let loaded = false
-    m.on('error', (e) => {
-      console.error('[harita]', e.error)
-      // Only a failure before the first full load means there is no map; later ones are one tile.
-      if (!loaded) setFailed(e.error?.message ?? 'bilinmeyen hata')
-    })
+    const stalled = setTimeout(() => {
+      if (!loaded) setFailed('harita dosyaları okunamadı.')
+    }, LOAD_TIMEOUT_MS)
+    m.on('error', (e) => console.warn('[harita]', e.error?.message ?? e.error))
     // A click picks the country; from zoom 5 on, where province names show, the province.
+    // Only layers the style has are asked; the sea or empty ground picks nothing, quietly.
     m.on('click', (e) => {
-      if (!loaded) return
-      const layers = m.getZoom() >= PROVINCE_CLICK_ZOOM ? ['province-fill', 'land'] : ['land']
-      const hits = m.queryRenderedFeatures(e.point, { layers })
+      const layers = (m.getZoom() >= PROVINCE_CLICK_ZOOM ? ['province-fill', 'land'] : ['land']).filter((id) => m.getLayer(id))
+      const hits = layers.length > 0 ? m.queryRenderedFeatures(e.point, { layers }) : []
       const province = hits.find((f) => f.layer.id === 'province-fill')
       const country = hits.find((f) => f.layer.id === 'land')
       const pick = province ?? country
@@ -135,12 +138,16 @@ export function MapView({ game, padding, selection, onSelect }: Props): React.JS
           : null
       )
     })
-    m.on('mousemove', (e) => {
-      if (!loaded) return
-      m.getCanvas().style.cursor = m.queryRenderedFeatures(e.point, { layers: ['land'] }).length > 0 ? 'pointer' : ''
+    // Layer events only query layers that exist.
+    m.on('mouseenter', 'land', () => {
+      m.getCanvas().style.cursor = 'pointer'
+    })
+    m.on('mouseleave', 'land', () => {
+      m.getCanvas().style.cursor = ''
     })
     m.on('load', () => {
       loaded = true
+      clearTimeout(stalled)
       // The camera fits the player's country into the open middle, once the panels' room is known.
       m.setPadding(paddingRef.current)
       const bounds = playerBounds(DEFAULT_PLAYER)
@@ -150,6 +157,7 @@ export function MapView({ game, padding, selection, onSelect }: Props): React.JS
     setMap(m)
     window.__csMap = m
     return () => {
+      clearTimeout(stalled)
       m.remove()
       setMap(null)
       setReady(false)
