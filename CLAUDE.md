@@ -91,7 +91,7 @@ xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli  
 
 Arayüz değişikliklerinde `test-results/` altındaki ekran görüntülerine bak. "Testler geçti" demek "çalışıyor" demek değil.
 
-`npm run kanit:cila` (gerçek Claude, 20 ay, abonelik harcar): olay sayısı ve tonu, hakem, tur süresi, bütün haberler → `test-results/cila/kanit.md`. `scripts/olay-sayim.mts <kayıt.sqlite>` herhangi bir kayıttaki olayları ay ay sayar.
+`npm run kanit:cila` (gerçek Claude, varsayılan 10 ay, abonelik harcar; `devam=1` yarıda kalan oyunu sürdürür): olay sayısı ve tonu, hakem, tur süresi, bütün haberler → `test-results/cila/kanit.md`. `scripts/olay-sayim.mts <kayıt.sqlite>` herhangi bir kayıttaki olayları ay ay sayar.
 
 Claude yolu testlerde kayıtlı gerçek cevaplarla (`tests/fixtures/claude/*.jsonl`, `ReplayProvider`) sınanır; canlı çağrı gerekmez. Prompt ya da şema değişince çağrı sırası değişirse `npm run record:claude` ile yeniden kaydet.
 
