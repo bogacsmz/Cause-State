@@ -1,5 +1,7 @@
 import { CARD_EFFECT_IDS, EFFECTS, type EffectId } from '@shared/game/catalog'
+import type { Tone } from '@shared/game/impacts'
 import type { GameState, Seed } from '@shared/game/schema'
+import { happeningsFrom, type Happening } from './director'
 import { createNewGame } from './new-game'
 import { checkDecision } from './referee'
 import { resolveTurn } from './resolve'
@@ -73,6 +75,9 @@ export interface GameResult {
   firstButterfly: number | null
   butterflies: number
   worldEvents: number
+  /** The world's own developments (the director's), and the tone of everything notable. */
+  developments: number
+  tones: Record<Tone, number>
   minStability: number
   trace: TurnTrace[]
 }
@@ -82,6 +87,7 @@ export async function playGame(bot: Bot, opts: { gameId: string; seed: number; t
   let state = createNewGame({ gameId: opts.gameId, seed: opts.seed })
   const rng = createRng(opts.seed ^ 0x9e3779b9)
   let seeds: Seed[] = []
+  let past: Happening[] = []
   const r: GameResult = {
     endTurn: 0,
     ending: null,
@@ -90,16 +96,22 @@ export async function playGame(bot: Bot, opts: { gameId: string; seed: number; t
     firstButterfly: null,
     butterflies: 0,
     worldEvents: 0,
+    developments: 0,
+    tones: { opportunity: 0, good: 0, neutral: 0, trouble: 0 },
     minStability: 100,
     trace: []
   }
   while (state.turn < opts.turns && state.status === 'playing') {
     const decisions = bot(state, rng)
-    const res = await resolveTurn(state, { decisions, orders: [], candidateSeeds: seeds.filter((s) => s.status === 'dormant') })
+    const res = await resolveTurn(state, { decisions, orders: [], candidateSeeds: seeds.filter((s) => s.status === 'dormant'), past })
     if (!res.ok) throw new Error(`${opts.gameId} turn ${state.turn + 1}: ${JSON.stringify(res.issues)}`)
     const { outcome } = res
     const updated = new Map(outcome.seedUpdates.map((s) => [s.id, s]))
     seeds = [...seeds.map((s) => updated.get(s.id) ?? s), ...outcome.seeds]
+    past = [...happeningsFrom(outcome.events), ...past].slice(0, 12)
+    const happenings = happeningsFrom(outcome.events)
+    r.developments += outcome.events.filter((e) => e.kind === 'development').length
+    for (const h of happenings) r.tones[h.tone]++
     state = outcome.newState
 
     const me = state.countries.find((c) => c.id === state.playerCountryId)!

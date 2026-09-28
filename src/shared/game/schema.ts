@@ -49,6 +49,8 @@ export const ActiveEffect = z.strictObject({
   source: z.enum(['player', 'foreign', 'world']),
   /** Set when this effect is the consequence of a fired butterfly seed. */
   seedId: z.string().nullable(),
+  /** The development's own name when the AI named it ("Kadıköy'de ekmek yürüyüşü"); else the catalog label. */
+  label: z.string().min(1).max(90).optional(),
   appliedTurn: Turn,
   /** First turn it is no longer active; null = until removed. */
   expiresTurn: Turn.nullable(),
@@ -62,6 +64,8 @@ export const EventKind = z.enum([
   'effect_applied',
   'effect_expired',
   'foreign_action',
+  /** Something the world brought this month on its own (the code chose the moment and tone, the AI the story). */
+  'development',
   'seed_planted',
   'seed_fired',
   'seed_fizzled',

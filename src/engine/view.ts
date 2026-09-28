@@ -1,5 +1,6 @@
 import { CARD_EFFECT_IDS, CATEGORY_LABELS, EFFECTS, type EffectDef } from '@shared/game/catalog'
 import { BAR_LABELS, countryRef, type BarId, type EntityRef } from '@shared/game/primitives'
+import { MAJOR_TAG, TONE_TAGS, type Tone } from '@shared/game/impacts'
 import type { GameEvent, GameState, Seed } from '@shared/game/schema'
 import type {
   ActiveEffectView,
@@ -15,7 +16,6 @@ import { coupChance } from './dynamics'
 import { entityName, findCountry } from './lookup'
 import { checkDecision, explainIssue } from './referee'
 import type { Decision } from './scripted-ai'
-import { seedOrigin } from './turn'
 
 /** The order bars appear in on screen: what decides elections first. */
 const DESK_ORDER: readonly BarId[] = ['approval', 'stability', 'economy', 'welfare', 'military', 'sovereignty', 'reputation']
@@ -87,8 +87,8 @@ export interface ViewInput {
   state: GameState
   /** Public events for the feed, oldest first. */
   feed: readonly GameEvent[]
-  /** Seeds referenced by fired-seed events in the feed, to show where they came from. */
-  seeds: readonly Seed[]
+  /** Seeds referenced by fired-seed events in the feed (kept in the record; the screen no longer labels them). */
+  seeds?: readonly Seed[]
   pending?: readonly PendingDecision[]
   chat?: readonly ChatEntry[]
   polls?: GameView['polls']
@@ -98,7 +98,6 @@ export interface ViewInput {
 export function buildView({
   state,
   feed,
-  seeds,
   pending = [],
   chat = [],
   polls = [],
@@ -107,7 +106,6 @@ export function buildView({
   const player = state.playerCountryId
   const me = findCountry(state, player)
   if (!me) throw new Error(`player country ${player} missing`)
-  const seedById = new Map(seeds.map((s) => [s.id, s]))
 
   const report = state.lastReport
   const bars: BarView[] = DESK_ORDER.map((id) => {
@@ -131,7 +129,7 @@ export function buildView({
       return {
         id: e.id,
         effectId: e.effectId,
-        label: e.target.id === player ? def.label : `${def.label}: ${entityName(state, e.target)}`,
+        label: e.label ?? (e.target.id === player ? def.label : `${def.label}: ${entityName(state, e.target)}`),
         source:
           e.source === 'player'
             ? 'Senin kararın'
@@ -144,8 +142,10 @@ export function buildView({
       }
     })
 
+  // Where a consequence came from stays in the record (and in the story); the screen shows
+  // it as the news it is, with only a quiet accent for how it lands.
   const feedView: FeedEvent[] = feed.map((e) => {
-    const seed = e.kind === 'seed_fired' && e.seedId ? seedById.get(e.seedId) : undefined
+    const tone = (Object.entries(TONE_TAGS) as Array<[Tone, string]>).find(([, tag]) => e.tags.includes(tag))?.[0]
     return {
       id: e.id,
       turn: e.turn,
@@ -153,7 +153,8 @@ export function buildView({
       kind: e.kind,
       title: e.title,
       summary: e.summary,
-      ...(seed ? { origin: { turn: seed.plantedTurn, label: seedOrigin(seed), butterfly: seed.sourceEffectId !== null } } : {})
+      ...(tone ? { tone } : {}),
+      ...(e.tags.includes(MAJOR_TAG) ? { major: true } : {})
     }
   })
 

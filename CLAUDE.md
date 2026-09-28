@@ -7,24 +7,27 @@ Tasarım belgeleri kod reposunda değil, vault'ta durur (`bogacsmz/obsidian_vaul
 - `Tasarim-Fikirleri.md`: onaylanmış mekanikler ve elenen fikirler (elenenleri tekrar önerme)
 - `Kararlar.md`
 
-Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) dört adımı bitti: veri hattı, tam ekran harita, politik renkler (GameState → feature-state) ve tıklama, komşuluk grafiği. Sırada fetih aksiyonunun motora bağlanması (kullanıcıyla birlikte açılacak).
+Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Faz 2 (gerçek Claude) bitti. Faz 3 (harita) dört adımı bitti: veri hattı, tam ekran harita, politik renkler (GameState → feature-state) ve tıklama, komşuluk grafiği. Şimdi **çekirdek cila** (fetihten önce, amaç eğlence): A (yapay zekaya yaratıcı alan, yeni prompt'lar), C (olay temposu: az, karışık tonda), D (kelebek kutusu yok, haberlere örülür) bitti; sırada B (hakemi gevşetmek) ve E (4 yıllık seçim, esnek tur atlama, hız). Fetih aksiyonu ondan sonra, kullanıcıyla birlikte açılacak.
 
 ## Mimari (kod = tek gerçek, LLM = sadece bulanık iş)
 
 - `src/shared/game/`: zod şemaları ve tipler. Tek kaynak bunlar: TypeScript tipi `z.infer` ile, ileride LLM'e giden JSON Schema da buradan üretilecek.
   - `primitives.ts`: barlar, ülke/il kimlikleri, EntityRef, etiketler.
-  - `catalog.ts`: etki sözlüğü. LLM'in seçebileceği her şey burada, sayılar sadece burada. LLM ham sayı üretmez, `hint` alanında sayı olmaz.
+  - `catalog.ts`: etki sözlüğü. LLM'in seçebileceği her şey burada, sayılar sadece burada. LLM ham sayı üretmez, `hint` alanında sayı olmaz. `improvised`: sözlükte olmayan, adını yapay zekanın koyduğu gelişme (sayıları `impacts.ts` tablosundan).
+  - `impacts.ts`: doğaçlama etki (çubuk + yön + "small/clear/large" + aylık mı + ne kadar sürer; kod sayıya çevirir: bir kerede 2/4/7, aylık 1/2/3) ve ayın temposu tipleri (ton: fırsat/iyi/nötr/kriz, ölçek: küçük/büyük, sahne: yurt içi/bir ülke/dünya). Ölçek sınırı `SCALE_LIMITS`: küçük olay oyuncuya toplam en çok 10 puan, büyük 20.
   - `schema.ts`: GameState (sert durum, küçük), GameEvent (olay kaydı), Seed (kelebek tohumu).
-  - `contract.ts`: TurnRequest (kod → LLM, sınırlı boyut, `LIMITS`) ve ChangeList (LLM → kod).
+  - `contract.ts`: TurnRequest (kod → LLM, sınırlı boyut, `LIMITS`) ve ChangeList (LLM → kod). ChangeList'te `developments` (dünyanın kendi gelişmesi: başlık, hikâye, yapan, hedef, sözlük hamleleri ve/veya doğaçlama etkiler) ve `seedOutcomes` (geri dönen karar; kendi başlığı ve istenirse doğaçlama etkisiyle). `ChangeList` tipi önerinin yazıldığı hâl (varsayılanlı alanlar boş bırakılabilir), `ParsedChangeList` okunmuş hâli.
 - `src/engine/`: saf, deterministik çekirdek. Electron/Node bağımlılığı yok.
-  - `referee.ts`: `reviewChangeList` tek kapı. Önce şema, sonra kurallar. Hata mesajları LLM'in onarabileceği İngilizce metin.
+  - `referee.ts`: `reviewChangeList` tek kapı. Önce şema, sonra kurallar. Hata mesajları LLM'in onarabileceği İngilizce metin. Gelişmeler için: yönetmen planlamadıysa gelişme yok, ton tutmalı (iyi haber oyuncuya yarar, kriz bir şey götürür), ölçeği aşmamalı. Tepkiler orantılı olmalı (oyuncu o ülkeye askerî/ağır bir hamle yapmadıysa küçük ölçek). `fitToPlan`: sadece "fazla büyük" olanı geri çevirmek yerine kısar (büyük kelimeyi küçültür, ağır tepkiyi düşürür, ağır sonucu doğaçlama etkiyle küçük anlatır); yanlış olanı (bilinmeyen kimlik, kural, ton) hakeme bırakır.
   - `loop.ts`: öner → doğrula → onar (sınırlı deneme).
   - `turn.ts`: `applyTurn(state, action) → { newState, events, seeds, seedUpdates, narration, report }`. Sadece `ApprovedChangeList` alır. Sıra: kararlar ve patlayan tohumlar etkiye dönüşür → barlar hareket eder → süresi biten etkiler düşer → seçim → darbe zarı → sermaye dolar.
   - `dynamics.ts`: barların kendi hareketi (onay/istikrar/refah hedefe oransal, ekonomi uzun vadeli seviyesine, piyasa dalgalanması) ve darbe şansı. Dengeyi değiştirmek = `DYNAMICS` tablosu + `catalog.ts` rakamları.
-  - `seeds.ts`: `planSeeds`, tohumun ne zaman patlayacağına AI'dan önce kod karar verir (anahtarlı zar). AI sadece sonucunu önerir (`seedOutcomes`).
+  - `director.ts`: **ayın temposu (yönetmen)**. AI'a sormadan önce kod karar verir: bu ay bir karar geri dönecek mi (en çok bir), dünya kendi gelişmesini getirecek mi, hangi tonda, ne büyüklükte, nerede başlayacak. Sakin aylar normaldir (gelişme ayların ~üçte birinde), tonlar karışık (fırsat+iyi ~%50, kriz ~%30), kriz arka arkaya nadiren gelir, büyük olay en az 8 ay arayla. Zor durumdaki hükümete daha çok fırsat, rahat olana daha çok dert. Geçmişini olay kaydındaki `gelisme` etiketinden okur (`happeningsFrom`). Oyuncunun kendi kararlarının sonucu tam ağırlıkla dönebilir; kendiliğinden gelen küçük kalır. Ayar tablosu `PACING`.
+  - `seeds.ts`: `planSeeds`, tohumun ne zaman patlayacağına AI'dan önce kod karar verir (anahtarlı zar; yönetmen yoğun bir aydan sonra şansı yarıya indirir). AI sadece sonucunu önerir (`seedOutcomes`).
+  - `weight.ts`: bir değişikliğin bir ülkeye toplam ağırlığı (bir kerelik + aylık × süre). Ton ve ölçek kontrolleri bununla yapılır.
   - `scripted-ai.ts`: kurallı yapay zeka (Faz 1). Artık yedek: `CS_AI_PROVIDER=mock`, Claude'a ulaşılamadığında ve denge botlarında. Claude ile aynı ChangeList'i üretir ve hakemden geçer.
-  - `resolve.ts`: `resolveTurn`, bir tur uçtan uca: planSeeds → öner→doğrula→onar → applyTurn. Claude `ProposerFactory` ile takılır. `withNarration` haberi kod uyguladıktan sonra yerine koyar (sayılara dokunmaz).
-  - `spotlight.ts`: bu ay hangi ülkelerin hamle yapacağına kod karar verir (kararların hedefleri + anahtarlı zarla gündemiyle hareket eden bir ülke); ne yapacaklarına Claude karar verir.
+  - `resolve.ts`: `resolveTurn`, bir tur uçtan uca: planMonth (yönetmen) → öner → fitToPlan → doğrula → onar → applyTurn. Claude `ProposerFactory` ile takılır. `withNarration` haberi kod uyguladıktan sonra yerine koyar (sayılara dokunmaz).
+  - `spotlight.ts`: bu ay kimin tepki verebileceğine kod karar verir: sadece oyuncunun kararlarının dokunduğu ülkeler (kararsız ayda kimse tepki vermez). Dünyanın kendi hamlesi yönetmenin gelişmesidir; `monthFocus` gelişmenin başladığı ülkeyi de bağlama ekler.
   - `view.ts`: `buildView`, arayüzün çizdiği `GameView` (etiketler dahil; arayüz motoru yüklemez).
   - `playtest.ts`: denge botları (boş, rastgele, popülist, otoriter, dengeli). `tests/game/balance.test.ts` eğlence sözleşmesini sayılarla korur.
   - `context.ts`: `buildTurnRequest`, her tur aynı üst sınırda bağlam.
@@ -32,8 +35,8 @@ Durum: Faz 0 (iskelet), Faz 0.5 (sözleşme), Faz 1 (salt metin çekirdek) ve Fa
 - `src/main/game/`: `GameSession` (tek kayıt dosyası, bu ayın kararları, kabine sohbeti; çağrılar sıraya girer) ve `game:*` IPC kanalları (+ `game:progress` akışı). Arayüzden gelen her argüman burada doğrulanır. Her yapay zeka çağrısı kaydın yanına `.log.jsonl` olarak yazılır (bağlam → öneri → hakem → sonuç; ileride fine-tune veri seti).
 - `src/main/game/claude/`: Claude beyni (`GameBrain`: `ClaudeBrain` ve kurallı `ScriptedBrain`).
   - `interpret`: yazılan mesaj → `talk` (bedava) ya da `action` (katalog hamleleri). Hamleler `checkDecision` ile hakemden geçer; ret gerekçesi Claude'a geri gider. İmkânsız emirde ilk öneri daima emrin birebir çevirisidir (fizibiliteye hakem karar verir), sonra Claude girişimin sonucunu (`reckless_gambit`) anlatır.
-  - `resolve`: Claude dünyayı oynar (spotlight ülkelerin hamleleri, yeni tohumlar, patlayan tohumların sonucu) → `reviewChangeList` → `applyTurn` → haber (akış). Başarısızlıkta kurallı yedek devreye girer ve söylenir.
-  - `prompts.ts`: sistem prompt'ları sabit (katalog kelimelerle, sayısız; dünya çerçevesi) → önbellekten gelir. Değişen her şey kullanıcı mesajında sınırlı TurnRequest olarak gider.
+  - `resolve`: Claude dünyayı oynar. İstekte yönetmenin planı gider: `reactors` (tepki verebilecekler), `development` (bu ayın gelişme yuvası: ton, ölçek, sahne; yoksa null = sakin ay), `consequenceScale`. Cevap: `reactions`, `development`, `consequences` (geri dönen kararlar), `newSeeds`. Uzun metin geri çevrilmez, kodda kısaltılır (`fitText`); hakemin itirazı Claude'un alan adlarıyla geri gider. → `reviewChangeList` → `applyTurn` → haber (akış). Başarısızlıkta kurallı yedek devreye girer ve söylenir.
+  - `prompts.ts`: sistem prompt'ları sabit (katalog kelimelerle, sayısız; doğaçlama etki dili; dünya çerçevesi) → önbellekten gelir. Ayrım: skoru kod tutar (sayılar, zar, ne zaman ve hangi tonda), dünyayı Claude canlandırır (kim, ne, nerede, nasıl anlatılır). Somutluk ister: gerçek iller, kurumlar, rolüyle kişiler (yaşayan politikacı adı yok), bağlamı süren hikâye. Haber masası: bağımsız gazete, 90–160 kelime, klişesiz; geri dönen kararın kaynağı haberin içinde doğal geçer, asla "kelebek etkisi" denmez; sakin ayda küçük insan hikâyesi.
   - `schemas.ts`: Claude'un cevap şemaları (yapılandırılmış çıktı: CLI `--json-schema`, API `output_config.format`). Kasıtlı olarak gevşek; asıl kontrol hakemde.
 - `src/shared/game/world-book.ts`: dondurulmuş 2026 dünya kitabı (15 ülke). Her istekte sadece ilgili 4 ülkenin girdisi gider.
 - `src/shared/tr.ts`: sayılardan sonra doğru Türkçe ek (`ek(3, 'de')` → "3'te"). Sayıya elle `'de`/`'e` yazma.
@@ -87,6 +90,8 @@ xvfb-run -a -s "-screen 0 1600x1000x24" npm run playthrough -- strategy=planli  
 ```
 
 Arayüz değişikliklerinde `test-results/` altındaki ekran görüntülerine bak. "Testler geçti" demek "çalışıyor" demek değil.
+
+`npm run kanit:cila` (gerçek Claude, 20 ay, abonelik harcar): olay sayısı ve tonu, hakem, tur süresi, bütün haberler → `test-results/cila/kanit.md`. `scripts/olay-sayim.mts <kayıt.sqlite>` herhangi bir kayıttaki olayları ay ay sayar.
 
 Claude yolu testlerde kayıtlı gerçek cevaplarla (`tests/fixtures/claude/*.jsonl`, `ReplayProvider`) sınanır; canlı çağrı gerekmez. Prompt ya da şema değişince çağrı sırası değişirse `npm run record:claude` ile yeniden kaydet.
 

@@ -1,5 +1,6 @@
 import { EFFECTS, type EffectId } from '@shared/game/catalog'
-import type { TurnAction, TurnOutcome } from '@shared/game/contract'
+import { LIMITS, type TurnAction, type TurnOutcome } from '@shared/game/contract'
+import { DEVELOPMENT_TAG, impactDelta, LASTS_TURNS, MAJOR_TAG, SCALE_LIMITS, TONE_TAGS, toneOfWeight, type Impact } from '@shared/game/impacts'
 import { BAR_IDS, countryRef, entityKey, type Bars, type EntityRef } from '@shared/game/primitives'
 import type { ActiveEffect, BarChange, GameEvent, GameState, Seed, TurnReport } from '@shared/game/schema'
 import { ek } from '@shared/tr'
@@ -8,6 +9,7 @@ import { entityName, findCountry, owningCountry } from './lookup'
 import { createRng } from './rng'
 import { DORMANCY_TURNS } from './seeds'
 import { addMonths, formatId, truncate, uniqueTags } from './util'
+import { developmentWeightOn, outcomeWeightOn } from './weight'
 
 export const MONTHS_PER_TURN = 1
 /** Approval bump for winning an election. */
@@ -57,41 +59,24 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
       : null
 
   let spent = 0
-  const applyEffect = (a: {
+  /** Puts an effect in force. Catalog numbers unless `modifiers` (an improvised development) are given. */
+  const addEffect = (a: {
     effectId: EffectId
     actor: string
     target: EntityRef
     source: ActiveEffect['source']
-    reason: string
-    causeId: string | null
+    originEventId: string
     seed?: Seed
-  }): void => {
+    label?: string
+    modifiers?: ActiveEffect['modifiers']
+    durationTurns?: number
+  }): ActiveEffect['modifiers'] => {
     const def = EFFECTS[a.effectId]
     const targetCountry = owningCountry(next, a.target) ?? a.actor
-    const modifiers = def.modifiers.map((m) => ({
-      country: m.on === 'actor' ? a.actor : targetCountry,
-      bar: m.bar,
-      delta: m.delta,
-      mode: m.mode
-    }))
-    const event = record({
-      kind: a.seed ? 'seed_fired' : a.source === 'player' ? 'effect_applied' : 'foreign_action',
-      visibility: 'public',
-      title: truncate(
-        a.seed
-          ? `${a.seed.sourceEffectId ? 'Kelebek etkisi' : 'Dünya gündemi'}: ${def.label}${a.actor === player ? '' : ` · ${entityName(next, countryRef(a.actor))}`}`
-          : owningCountry(next, a.target) === a.actor && a.target.type === 'country'
-            ? def.label
-            : `${def.label}: ${entityName(next, a.target)}`,
-        160
-      ),
-      summary: a.reason,
-      entities: dedupe([countryRef(a.actor), a.target, ...modifiers.map((m) => countryRef(m.country))]),
-      tags: uniqueTags(def.tags),
-      causeId: a.causeId,
-      effectId: a.effectId,
-      ...(a.seed ? { seedId: a.seed.id } : {})
-    })
+    const modifiers =
+      a.modifiers ??
+      def.modifiers.map((m) => ({ country: m.on === 'actor' ? a.actor : targetCountry, bar: m.bar, delta: m.delta, mode: m.mode }))
+    const duration = a.durationTurns ?? def.durationTurns
     next.effects.push({
       id: formatId('fx', next.counters.effect++),
       effectId: a.effectId,
@@ -99,50 +84,124 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
       target: a.target,
       source: a.source,
       seedId: a.seed?.id ?? null,
+      ...(a.label ? { label: truncate(a.label, LIMITS.titleChars) } : {}),
       appliedTurn: next.turn,
-      expiresTurn: def.durationTurns === null ? null : next.turn + def.durationTurns,
+      expiresTurn: duration === null ? null : next.turn + duration,
       modifiers,
-      originEventId: event.id
+      originEventId: a.originEventId
     })
     if (a.source === 'player') spent += def.cost
+    return modifiers
+  }
+
+  /** Improvised impacts, as numbers from the code's table, landing on the target's country. */
+  const improvised = (impacts: readonly Impact[], target: EntityRef, actor: string): ActiveEffect['modifiers'] => {
+    const country = owningCountry(next, target) ?? actor
+    return impacts.map((i) => ({ country, bar: i.bar, delta: impactDelta(i), mode: i.monthly ? ('per_turn' as const) : ('once' as const) }))
+  }
+
+  /** A decision or another country's move: one line of history and the effect it puts in force. */
+  const applyMove = (a: { effectId: EffectId; actor: string; target: EntityRef; source: 'player' | 'foreign'; reason: string; causeId: string | null }): void => {
+    const def = EFFECTS[a.effectId]
+    const targetCountry = owningCountry(next, a.target) ?? a.actor
+    const event = record({
+      kind: a.source === 'player' ? 'effect_applied' : 'foreign_action',
+      visibility: 'public',
+      title: truncate(targetCountry === a.actor && a.target.type === 'country' ? def.label : `${def.label}: ${entityName(next, a.target)}`, 160),
+      summary: a.reason,
+      entities: dedupe([
+        countryRef(a.actor),
+        a.target,
+        ...def.modifiers.map((m) => countryRef(m.on === 'actor' ? a.actor : targetCountry))
+      ]),
+      tags: uniqueTags(def.tags),
+      causeId: a.causeId,
+      effectId: a.effectId
+    })
+    addEffect({ ...a, originEventId: event.id })
   }
 
   for (const c of changes.changes) {
-    applyEffect({ effectId: c.effectId, actor: player, target: c.target, source: 'player', reason: c.reason, causeId: order?.id ?? null })
+    applyMove({ effectId: c.effectId, actor: player, target: c.target, source: 'player', reason: c.reason, causeId: order?.id ?? null })
   }
   for (const f of changes.foreignIntents) {
-    applyEffect({ effectId: f.effectId, actor: f.actor, target: f.target, source: 'foreign', reason: f.reason, causeId: order?.id ?? null })
+    applyMove({ effectId: f.effectId, actor: f.actor, target: f.target, source: 'foreign', reason: f.reason, causeId: order?.id ?? null })
   }
 
-  // Fired seeds: the code chose the moment, the (fake or real) AI chose the outcome.
+  // The world's own development this month: the code chose the moment and the tone, the AI the story.
+  const beat = plan.beat ?? null
+  for (const d of changes.developments) {
+    const actor = d.actor ?? owningCountry(next, d.target) ?? player
+    const source = d.actor ? 'foreign' : 'world'
+    const tone = beat?.tone ?? toneOfWeight(developmentWeightOn(next, d, player))
+    const event = record({
+      kind: 'development',
+      visibility: 'public',
+      title: truncate(d.title, 160),
+      summary: d.story,
+      entities: dedupe([countryRef(player), ...(d.actor ? [countryRef(d.actor)] : []), d.target]),
+      tags: uniqueTags([DEVELOPMENT_TAG, TONE_TAGS[tone], ...(beat?.scale === 'major' ? [MAJOR_TAG] : []), ...d.moves.flatMap((id) => EFFECTS[id].tags)]),
+      causeId: null,
+      ...(d.moves[0] ? { effectId: d.moves[0] } : d.impacts.length > 0 ? { effectId: 'improvised' as const } : {})
+    })
+    for (const effectId of d.moves) addEffect({ effectId, actor, target: d.target, source, originEventId: event.id, label: d.title })
+    if (d.impacts.length > 0) {
+      addEffect({
+        effectId: 'improvised',
+        actor,
+        target: d.target,
+        source,
+        originEventId: event.id,
+        label: d.title,
+        modifiers: improvised(d.impacts, d.target, actor),
+        durationTurns: LASTS_TURNS[d.lasts]
+      })
+    }
+  }
+
+  // Fired seeds: the code chose the moment, the (fake or real) AI chose the outcome. They are
+  // told as news of their own; where they came from lives in the record and in the story.
   const firedSeeds: TurnReport['firedSeeds'] = []
   for (const seed of plan.firing) {
     const outcome = changes.seedOutcomes.find((o) => o.seedId === seed.id)
     if (!outcome) throw new Error(`firing seed ${seed.id} has no outcome; the referee should have caught this`)
     const origin = seedOrigin(seed)
-    if (outcome.effectId && outcome.target) {
-      const actor = outcome.actor ?? owningCountry(next, outcome.target) ?? player
-      applyEffect({
-        effectId: outcome.effectId,
+    const target = outcome.target ?? countryRef(player)
+    const actor = outcome.actor ?? owningCountry(next, target) ?? player
+    const source = outcome.actor ? 'foreign' : 'world'
+    const weight = outcomeWeightOn(next, outcome, player)
+    const tone = plan.seedTone ?? toneOfWeight(weight)
+    const move = outcome.effectId && outcome.target ? outcome.effectId : null
+    const title =
+      outcome.title ?? (move ? `${EFFECTS[move].label}${actor === player ? '' : ` · ${entityName(next, countryRef(actor))}`}` : 'Geçmişin yankısı')
+    const event = record({
+      kind: 'seed_fired',
+      visibility: 'public',
+      title: truncate(title, 160),
+      summary: outcome.reason,
+      entities: dedupe([...seed.entities, ...(outcome.actor ? [countryRef(outcome.actor)] : []), target]),
+      // Big only when it really landed hard, so the director spaces the next big story after it.
+      tags: uniqueTags([DEVELOPMENT_TAG, TONE_TAGS[tone], ...(Math.abs(weight) > SCALE_LIMITS.minor.maxWeight ? [MAJOR_TAG] : []), ...seed.tags]),
+      causeId: seed.originEventId,
+      seedId: seed.id,
+      ...(move ? { effectId: move } : outcome.impacts.length > 0 ? { effectId: 'improvised' as const } : {})
+    })
+    if (move) addEffect({ effectId: move, actor, target, source, originEventId: event.id, seed, ...(outcome.title ? { label: outcome.title } : {}) })
+    if (outcome.impacts.length > 0) {
+      addEffect({
+        effectId: 'improvised',
         actor,
-        target: outcome.target,
-        source: outcome.actor ? 'foreign' : 'world',
-        reason: outcome.reason,
-        causeId: seed.originEventId,
-        seed
+        target,
+        source,
+        originEventId: event.id,
+        seed,
+        label: title,
+        modifiers: improvised(outcome.impacts, target, actor),
+        durationTurns: LASTS_TURNS[outcome.lasts]
       })
-      firedSeeds.push({ seedId: seed.id, plantedTurn: seed.plantedTurn, effectId: outcome.effectId, source: seed.sourceEffectId, origin })
-    } else {
-      record({
-        kind: 'seed_fired',
-        visibility: 'public',
-        title: seed.sourceEffectId ? 'Kelebek etkisi' : 'Dünya gündemi',
-        summary: outcome.reason,
-        entities: seed.entities,
-        tags: seed.tags,
-        causeId: seed.originEventId,
-        seedId: seed.id
-      })
+    }
+    if (move || outcome.impacts.length > 0) {
+      firedSeeds.push({ seedId: seed.id, plantedTurn: seed.plantedTurn, effectId: move ?? 'improvised', source: seed.sourceEffectId, origin })
     }
     seedUpdates.push({ ...seed, status: 'fired', firedTurn: next.turn })
   }
@@ -201,7 +260,8 @@ export function applyTurn(state: GameState, action: TurnAction): TurnOutcome {
     // One-turn effects (a protest note) start and end in the same turn; no need to announce the end.
     if (touchesPlayer && e.appliedTurn < next.turn) {
       const other = e.actor !== player ? countryRef(e.actor) : owningCountry(next, e.target) !== player ? e.target : null
-      const label = other ? `${EFFECTS[e.effectId].label}: ${entityName(next, other)}` : EFFECTS[e.effectId].label
+      const name = e.label ?? EFFECTS[e.effectId].label
+      const label = other && !e.label ? `${name}: ${entityName(next, other)}` : name
       expired.push(label)
       record({
         kind: 'effect_expired',

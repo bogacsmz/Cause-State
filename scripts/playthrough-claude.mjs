@@ -116,7 +116,8 @@ try {
     say(`  SONUÇ (${Math.round((Date.now() - started) / 1000)} sn): ${bars(v)}`)
     for (const e of v.feed.filter((e) => e.turn === n)) {
       if (e.kind === 'foreign_action') say(`    dış hamle: ${e.title} — ${e.summary}`)
-      if (e.kind === 'seed_fired') say(`    ${e.origin?.butterfly === false ? 'DÜNYA' : 'KELEBEK'} (kaynak tur ${e.origin?.turn} · ${e.origin?.label}): ${e.title} — ${e.summary}`)
+      if (e.kind === 'seed_fired') say(`    GERİ DÖNEN (${e.tone}): ${e.title} — ${e.summary}`)
+      if (e.kind === 'development') say(`    GELİŞME (${e.tone}${e.major ? ', büyük' : ''}): ${e.title} — ${e.summary}`)
     }
     if (r.election) say(`    SEÇİM: oy %${r.election.vote}, baraj %${r.election.threshold} → ${r.election.won ? 'KAZANDI' : 'KAYBETTİ'}`)
     if (r.coup) say(`    darbe riski %${Math.round(r.coup.chance * 100)} → ${r.coup.happened ? 'DARBE' : 'olmadı'}`)

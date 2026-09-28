@@ -164,12 +164,9 @@ function Effects({ effects }: { effects: ActiveEffectView[] }): React.JSX.Elemen
       ) : (
         <ul className="effects__list">
           {effects.map((e) => (
-            <li key={e.id} className={`effect${e.fromSeed ? ' effect--echo' : ''}`}>
+            <li key={e.id} className="effect">
               <div className="effect__head">
-                <span className="effect__label">
-                  {e.fromSeed && <span className="effect__echo" title="Geçmişten geri döndü">↺</span>}
-                  {e.label}
-                </span>
+                <span className="effect__label">{e.label}</span>
                 <span className="effect__left">{e.turnsLeft === null ? 'kalıcı' : e.turnsLeft === 0 ? 'son ay' : `${e.turnsLeft} ay daha`}</span>
               </div>
               <div className="effect__meta">

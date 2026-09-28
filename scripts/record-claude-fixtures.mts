@@ -3,8 +3,9 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Seed } from '../src/shared/game/schema'
+import type { GameState, Seed } from '../src/shared/game/schema'
 import { createNewGame } from '../src/engine/new-game'
+import { planMonth } from '../src/engine/director'
 import { hashRoll } from '../src/engine/rng'
 import { FIRE_CHANCE } from '../src/engine/seeds'
 import { ClaudeCliProvider } from '../src/main/ai/claude-cli'
@@ -59,7 +60,26 @@ const decisions: Commitment[] = creative.decisions
 const month = await brainFor('turn').resolve({ state: turnState, decisions, orders: [CREATIVE], dueSeeds: [seed], relevantSeeds: [], recentEvents: [] })
 console.log('turn:', month.fallback ?? 'ok', month.resolution.outcome.report.firedSeeds, month.resolution.outcome.narration.headline)
 
-// 5: a whole session through the main-process API
+// 5: a quiet month in which the world brings a development of its own (the director planned one)
+export const DEVELOPMENT_GAME = 'kayit-gelisme'
+const quiet = createNewGame({ gameId: DEVELOPMENT_GAME, seed: 12 })
+export const DEVELOPMENT_TURN = firstBeatTurn(quiet)
+const developmentMonth = await brainFor('development').resolve({
+  state: { ...quiet, turn: DEVELOPMENT_TURN },
+  decisions: [],
+  orders: [],
+  dueSeeds: [],
+  relevantSeeds: [],
+  recentEvents: []
+})
+console.log(
+  'development:',
+  developmentMonth.fallback ?? 'ok',
+  developmentMonth.resolution.plan.beat,
+  developmentMonth.resolution.outcome.events.find((e) => e.kind === 'development')?.title
+)
+
+// 6: a whole session through the main-process API
 const saves = mkdtempSync(join(tmpdir(), 'cs-record-session-'))
 const session = await GameSession.open(saves, { brain: brainFor('session'), first: { gameId: 'kayit-oturum', seed: 3 } })
 await session.command(CREATIVE)
@@ -67,3 +87,9 @@ await session.command('Şu an seçimi kazanır mıyız?')
 const view = await session.endTurn()
 console.log('session:', view.turn, view.feed.filter((e) => e.kind === 'narration').at(-1)?.title)
 session.close()
+
+/** The first month in which the director plans a development with no history (keep in step with the test). */
+function firstBeatTurn(state: GameState): number {
+  for (let turn = 0; turn < 50; turn++) if (planMonth({ ...state, turn }, [], []).beat?.tone === 'opportunity') return turn
+  throw new Error('no opportunity month found')
+}

@@ -1,3 +1,4 @@
+import type { Tone } from './impacts'
 import type { EffectCategory, EffectId } from './catalog'
 import type { BarId, EntityRef } from './primitives'
 import type { BarCause, Ending, EventKind, TurnReport } from './schema'
@@ -64,8 +65,10 @@ export interface FeedEvent {
   kind: EventKind
   title: string
   summary: string
-  /** For fired seeds: where it started. `butterfly` = the player's own decision caused it. */
-  origin?: { turn: number; label: string; butterfly: boolean }
+  /** For developments and consequences coming back: how it lands, for a quiet accent on screen. */
+  tone?: Tone
+  /** Big story of the year. */
+  major?: boolean
 }
 
 /** A line of conversation with the cabinet. Talking is free; orders become decisions. */

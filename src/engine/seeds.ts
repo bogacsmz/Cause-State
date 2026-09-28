@@ -18,8 +18,9 @@ export const LOW_BAR = 35
 /**
  * Decides, before the turn is resolved, which due seeds fire and which fade. The roll is
  * keyed by game, seed and turn, so it is reproducible and independent of other dice.
+ * `fireFactor` scales every fire chance (the director lowers it right after a busy month).
  */
-export function planSeeds(state: GameState, candidates: readonly Seed[]): SeedPlan {
+export function planSeeds(state: GameState, candidates: readonly Seed[], fireFactor = 1): SeedPlan {
   const turn = state.turn + 1
   const firing: Seed[] = []
   const fizzled: Seed[] = []
@@ -35,7 +36,7 @@ export function planSeeds(state: GameState, candidates: readonly Seed[]): SeedPl
     }
     if (firing.length >= LIMITS.firingSeeds) continue
     if (!conditionMet(state, seed.condition)) continue
-    if (hashRoll(`${state.gameId}|${seed.id}|${turn}`) < FIRE_CHANCE[seed.likelihood]) firing.push(seed)
+    if (hashRoll(`${state.gameId}|${seed.id}|${turn}`) < FIRE_CHANCE[seed.likelihood] * fireFactor) firing.push(seed)
   }
   return { firing, fizzled }
 }

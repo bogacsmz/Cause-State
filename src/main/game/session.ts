@@ -5,7 +5,9 @@ import { EFFECTS, type EffectId } from '@shared/game/catalog'
 import type { EntityRef } from '@shared/game/primitives'
 import type { GameState } from '@shared/game/schema'
 import type { ActionResult, ChatEntry, GameProgress, GameView } from '@shared/game/view'
+import { DEVELOPMENT_TAG } from '@shared/game/impacts'
 import { relevantEntities } from '../../engine/context'
+import { happeningsFrom } from '../../engine/director'
 import { entityName } from '../../engine/lookup'
 import { createNewGame } from '../../engine/new-game'
 import { checkDecision, explainIssue } from '../../engine/referee'
@@ -22,7 +24,7 @@ export interface SessionOptions {
   /** Who reads orders and plays the world. Default: the scripted rules. */
   brain?: GameBrain
   /** Fixes the dice and id of a new game started by `open`, for reproducible demos and tests. */
-  first?: { seed?: number; gameId?: string }
+  first?: { seed?: number; gameId?: string; electionEveryTurns?: number }
 }
 
 /**
@@ -161,7 +163,8 @@ export class GameSession {
           orders,
           dueSeeds: await this.store.dueSeeds(this.state.turn + 1),
           relevantSeeds: await this.store.seedsForEntities(relevantEntities(this.state, orders.join('\n'), decisions), { limit: 12 }),
-          recentEvents: await this.store.recentEvents({ limit: 30 })
+          recentEvents: await this.store.recentEvents({ limit: 30 }),
+          past: happeningsFrom(await this.store.eventsByTag(DEVELOPMENT_TAG, { limit: 12 }))
         },
         {
           ...this.logHooks(),
@@ -217,13 +220,10 @@ export class GameSession {
 
   private async buildView(): Promise<GameView> {
     const feed = await this.store.feedSince(Math.max(0, this.state.turn - FEED_TURNS + 1))
-    const seedIds = feed.flatMap((e) => (e.kind === 'seed_fired' && e.seedId ? [e.seedId] : []))
-    const seeds = await this.store.seedsByIds(seedIds)
     const history = await this.store.barHistory(this.state.playerCountryId, 'approval')
     const view = buildView({
       state: this.state,
       feed,
-      seeds,
       pending: this.pending,
       chat: this.chat.filter((c) => c.turn > this.state.turn - FEED_TURNS),
       polls: history.map((h) => ({ turn: h.turn, approval: h.value })),
@@ -245,13 +245,17 @@ export class GameSession {
 
 async function startGame(
   dir: string,
-  fixed: { seed?: number; gameId?: string } = {}
+  fixed: { seed?: number; gameId?: string; electionEveryTurns?: number } = {}
 ): Promise<{ store: GameStore; state: GameState; file: string }> {
   // Fixed-width base-36 time, so names sort by creation.
   const gameId = fixed.gameId ?? `g${Date.now().toString(36).padStart(9, '0')}`
   const file = join(dir, `${SAVE_PREFIX}${gameId}.sqlite`)
   const store = GameStore.open(file)
-  const state = createNewGame({ gameId, seed: fixed.seed ?? randomInt(2 ** 31) })
+  const state = createNewGame({
+    gameId,
+    seed: fixed.seed ?? randomInt(2 ** 31),
+    ...(fixed.electionEveryTurns ? { electionEveryTurns: fixed.electionEveryTurns } : {})
+  })
   await store.saveSnapshot(state)
   return { store, state, file }
 }

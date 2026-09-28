@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EFFECT_IDS, EFFECTS, PLAYER_EFFECT_IDS } from '@shared/game/catalog'
+import { CATALOG_EFFECT_IDS, EFFECTS, PLAYER_EFFECT_IDS } from '@shared/game/catalog'
 import { BAR_IDS } from '@shared/game/primitives'
 import { START_COUNTRIES, START_PROVINCES } from '../../../engine/world-seed'
 
@@ -9,7 +9,18 @@ import { START_COUNTRIES, START_PROVINCES } from '../../../engine/world-seed'
 
 const CountryIdWire = z.enum(START_COUNTRIES.map((c) => c.id) as [string, ...string[]])
 const ProvinceIdWire = z.enum(START_PROVINCES.map((p) => p.id) as [string, ...string[]])
-const EffectIdWire = z.enum(EFFECT_IDS)
+const EffectIdWire = z.enum(CATALOG_EFFECT_IDS as [string, ...string[]])
+/** Moves someone other than the player's government may make (another country, or society and the world). */
+const WorldEffectIdWire = z.enum(CATALOG_EFFECT_IDS.filter((id) => EFFECTS[id].actors.some((a) => a !== 'player')) as [string, ...string[]])
+
+/** An improvised change in words; the code turns it into numbers. */
+const ImpactWire = z.object({
+  bar: z.enum(BAR_IDS),
+  change: z.enum(['up', 'down']),
+  size: z.enum(['small', 'clear', 'large']),
+  monthly: z.boolean()
+})
+const LastsWire = z.enum(['month', 'season', 'half_year'])
 const PlayerEffectIdWire = z.enum(PLAYER_EFFECT_IDS as [string, ...string[]])
 
 const TargetWire = z.discriminatedUnion('type', [
@@ -33,10 +44,36 @@ const ConditionWire = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('effect_active'), effectId: EffectIdWire, country: CountryIdWire })
 ])
 
-/** The world's answer for one month: other countries' moves, new seeds, fired seeds' outcomes. */
+/**
+ * The world's answer for one month: reactions to the player's moves, the world's own
+ * development (when the code planned one), consequences coming back, new seeds.
+ */
 export const WorldReplyWire = z.object({
   interpretation: z.string(),
-  foreignIntents: z.array(z.object({ actor: CountryIdWire, effectId: EffectIdWire, target: TargetWire, reason: z.string() })),
+  reactions: z.array(z.object({ actor: CountryIdWire, effectId: WorldEffectIdWire, target: TargetWire, reason: z.string() })),
+  development: z
+    .object({
+      title: z.string(),
+      story: z.string(),
+      actor: CountryIdWire.nullable(),
+      target: CountryIdWire,
+      moves: z.array(WorldEffectIdWire),
+      impacts: z.array(ImpactWire),
+      lasts: LastsWire
+    })
+    .nullable(),
+  consequences: z.array(
+    z.object({
+      seedId: z.string(),
+      title: z.string(),
+      reason: z.string(),
+      actor: CountryIdWire.nullable(),
+      effectId: WorldEffectIdWire.nullable(),
+      target: TargetWire.nullable(),
+      impacts: z.array(ImpactWire),
+      lasts: LastsWire
+    })
+  ),
   newSeeds: z.array(
     z.object({
       source: EffectIdWire.nullable(),
@@ -46,15 +83,6 @@ export const WorldReplyWire = z.object({
       dormancy: z.enum(['short', 'medium', 'long']),
       likelihood: z.enum(['unlikely', 'possible', 'likely']),
       condition: ConditionWire.nullable()
-    })
-  ),
-  seedOutcomes: z.array(
-    z.object({
-      seedId: z.string(),
-      actor: CountryIdWire.nullable(),
-      effectId: EffectIdWire.nullable(),
-      target: TargetWire.nullable(),
-      reason: z.string()
     })
   )
 })

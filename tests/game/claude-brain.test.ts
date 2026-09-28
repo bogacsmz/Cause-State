@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AiResult } from '../../src/shared/ipc'
 import { ChangeList } from '../../src/shared/game/contract'
-import type { Seed } from '../../src/shared/game/schema'
+import type { GameState, Seed } from '../../src/shared/game/schema'
+import { planMonth } from '../../src/engine/director'
 import { createNewGame } from '../../src/engine/new-game'
 import { reviewChangeList } from '../../src/engine/referee'
 import { ReplayProvider } from '../../src/main/ai/recording'
@@ -68,7 +69,7 @@ describe('Claude reads a typed order', () => {
 })
 
 describe('Claude plays the world for a month', () => {
-  it('proposes the world moves, the referee approves, a butterfly fires with its origin, the news is Claude’s', async () => {
+  it('proposes the world moves, the referee approves, an earlier decision comes back as news, the news is Claude’s', async () => {
     const turnState = { ...createNewGame({ gameId: 'kayit-tur-2', seed: 9 }), turn: 3, date: '2026-04-01' }
     const seed: Seed = {
       id: 'sd-000001',
@@ -105,24 +106,63 @@ describe('Claude plays the world for a month', () => {
 
     expect(fallback).toBeUndefined()
     expect(resolution.attempts).toBe(1)
-    // The approved list really passes the referee on its own.
-    expect(reviewChangeList(ChangeList.parse(resolution.changes), turnState, { firingSeeds: [seed] }).ok).toBe(true)
+    // The approved list really passes the referee on its own, in the month the director planned.
+    const plan = resolution.plan
+    expect(reviewChangeList(ChangeList.parse(resolution.changes), turnState, { firingSeeds: [seed], beat: plan.beat ?? null, seedScale: plan.seedScale }).ok).toBe(true)
     expect(provider.requests[0]).toMatchObject({ schema: WORLD_REPLY_SCHEMA, effort: 'medium' })
+    // Claude was told how the month is paced: who may react, whether the world brings something, how big a consequence may be.
+    expect(provider.requests[0]!.prompt).toContain('"reactors":["SYR","RUS"]')
+    expect(provider.requests[0]!.prompt).toContain('"consequenceScale":"major"')
 
     const { outcome } = resolution
     expect(outcome.report.firedSeeds).toEqual([expect.objectContaining({ seedId: seed.id, source: 'press_crackdown', origin: 'Basına baskı' })])
-    expect(outcome.seeds.length).toBeGreaterThan(0)
+    // It comes back as news of its own, without a label; the story says where it came from.
+    const back = outcome.events.find((e) => e.kind === 'seed_fired')!
+    expect(back.title).not.toMatch(/kelebek|tohum/i)
+    expect(back.summary).toMatch(/Şubat|basın|gazete/i)
+    expect(back.tags).toContain('gelisme')
     expect(outcome.seeds.every((s) => s.plantedTurn === 4)).toBe(true)
 
     // The newsroom wrote after the code applied the month, and its text replaced the placeholder.
     const narration = outcome.events.find((e) => e.kind === 'narration')!
     expect(narration.title).toBe(outcome.narration.headline)
     expect(news.startsWith(outcome.narration.headline)).toBe(true)
-    expect(outcome.narration.headline).toMatch(/basın|baskı/i)
+    expect(outcome.narration.body).not.toMatch(/kelebek/i)
     expect(phases).toEqual(['world', 'referee', 'news'])
     expect(calls.map((c) => c.role)).toEqual(['resolve', 'narrate'])
   })
 })
+
+describe('the world brings something of its own', () => {
+  it('in a quiet month the director planned an opening, Claude writes it and the code applies it', async () => {
+    const quiet = createNewGame({ gameId: 'kayit-gelisme', seed: 12 })
+    const turn = firstOpportunityTurn(quiet)
+    const provider = fixture('development')
+    const { resolution, fallback } = await new ClaudeBrain(provider).resolve({
+      state: { ...quiet, turn },
+      decisions: [],
+      orders: [],
+      dueSeeds: [],
+      relevantSeeds: [],
+      recentEvents: []
+    })
+    expect(fallback).toBeUndefined()
+    expect(resolution.plan.beat).toMatchObject({ tone: 'opportunity' })
+    expect(provider.requests[0]!.prompt).toContain('"development":{"tone":"opportunity"')
+    const event = resolution.outcome.events.find((e) => e.kind === 'development')!
+    expect(event.title.length).toBeGreaterThan(10)
+    expect(event.summary.length).toBeGreaterThan(40)
+    expect(event.tags).toEqual(expect.arrayContaining(['gelisme', 'ton-firsat']))
+    // Nobody reacts to a month without decisions.
+    expect(resolution.outcome.events.some((e) => e.kind === 'foreign_action')).toBe(false)
+  })
+})
+
+/** Same search as scripts/record-claude-fixtures.mts. */
+function firstOpportunityTurn(state: GameState): number {
+  for (let turn = 0; turn < 50; turn++) if (planMonth({ ...state, turn }, [], []).beat?.tone === 'opportunity') return turn
+  throw new Error('no opportunity month found')
+}
 
 describe('the whole session with Claude (recorded)', () => {
   const open: GameSession[] = []
@@ -149,7 +189,7 @@ describe('the whole session with Claude (recorded)', () => {
     expect(view.turn).toBe(1)
     expect(view.ai).toEqual({ kind: 'claude', notice: null })
     const news = view.feed.filter((e) => e.kind === 'narration').at(-1)!
-    expect(news.title).toContain('Suriye')
+    expect(`${news.title} ${news.summary}`).toMatch(/Suriye|sınır/i)
     // The events carry Claude's reading of the order, not a generic label.
     expect(view.feed.find((e) => e.kind === 'effect_applied')!.summary.length).toBeGreaterThan(30)
 
@@ -235,9 +275,10 @@ describe('repair on a malformed answer', () => {
     const world = (effectId: string) =>
       JSON.stringify({
         interpretation: 'Hükûmet vergileri indirdi.',
-        foreignIntents: [{ actor: 'RUS', effectId, target: { type: 'country', id: 'TUR' }, reason: 'Moskova tepki gösterdi.' }],
-        newSeeds: [],
-        seedOutcomes: []
+        reactions: [{ actor: 'RUS', effectId, target: { type: 'country', id: 'TUR' }, reason: 'Moskova tepki gösterdi.' }],
+        development: null,
+        consequences: [],
+        newSeeds: []
       })
     // Tax cuts are the player's move only; a diplomatic note is what Moscow can do.
     const provider = new Scripted([world('tax_cut'), world('diplomatic_protest'), 'Vergiler indi\n\nAnkara vergileri indirdi.'])
@@ -256,7 +297,9 @@ describe('repair on a malformed answer', () => {
     expect(fallback).toBeUndefined()
     expect(provider.prompts[1]).toContain('The referee rejected your previous answer')
     expect(log.map((c) => `${c.role}${c.attempt}:${c.issues.length > 0 ? 'rejected' : 'ok'}`)).toEqual(['resolve1:rejected', 'resolve2:ok', 'narrate1:ok'])
-    expect(log[0]!.issues.join(' ')).toContain('foreignIntents')
+    // The referee's objection comes back in the names Claude wrote (reactions, not foreignIntents).
+    expect(log[0]!.issues.join(' ')).toContain('reactions[0]')
+    expect(provider.prompts[1]).toContain('"tax_cut" cannot be done by a foreign country')
     expect(resolution.outcome.events.some((e) => e.kind === 'foreign_action')).toBe(true)
   })
 })

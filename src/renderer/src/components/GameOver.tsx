@@ -32,7 +32,7 @@ export function GameOver({ view, busy, onNewGame }: { view: GameView; busy: bool
             <dd>{stability}</dd>
           </div>
         </dl>
-        <p className="end__hint">Brifingde neyin nereden geldiğini okuyabilirsin. Kelebeklerin izi orada.</p>
+        <p className="end__hint">Brifingde neyin nereden geldiğini okuyabilirsin: kararlarının izi haberlerde.</p>
         <button type="button" className="btn btn--primary" onClick={onNewGame} disabled={busy} autoFocus>
           Yeni oyun
         </button>

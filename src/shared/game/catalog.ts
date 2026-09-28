@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { weightOf } from './impacts'
 import type { BarId } from './primitives'
 
 // The effect catalog: everything that can happen in the world. The LLM picks an id and a
@@ -81,7 +82,9 @@ export const EFFECT_IDS = [
   'scandal',
   'strike_wave',
   'public_goodwill',
-  'export_boom'
+  'export_boom',
+  // a development the AI named and shaped itself (numbers from src/shared/game/impacts.ts)
+  'improvised'
 ] as const
 export const EffectId = z.enum(EFFECT_IDS)
 export type EffectId = z.infer<typeof EffectId>
@@ -1252,11 +1255,45 @@ export const EFFECTS: { readonly [K in EffectId]: EffectDef & { id: K } } = {
     rules: [],
     modifiers: [perTurn('economy', 2)],
     tags: ['ekonomi', 'ihracat']
+  },
+
+  // Not chosen from the catalog: the AI names a development and describes its shape in words,
+  // the code turns the words into modifiers (impacts.ts). Each copy carries its own label.
+  improvised: {
+    id: 'improvised',
+    label: 'Gelişme',
+    summary: 'Adını ve şeklini yapay zekanın koyduğu bir gelişme; büyüklüğünü kod belirler.',
+    hint: 'A development with its own name, described with impacts instead of a catalog id.',
+    category: 'world',
+    target: 'country',
+    actors: ['world', 'foreign'],
+    cost: 0,
+    durationTurns: 1,
+    unique: false,
+    card: false,
+    rules: [],
+    modifiers: [],
+    tags: ['gelisme']
   }
 }
 
 /** Effects the player's government can choose, in catalog order. */
 export const PLAYER_EFFECT_IDS = EFFECT_IDS.filter((id) => EFFECTS[id].actors.includes('player'))
+
+/** Everything the AI may name by id; improvised developments are described with impacts instead. */
+export const CATALOG_EFFECT_IDS = EFFECT_IDS.filter((id) => id !== 'improvised')
+
+/**
+ * An effect's weight on the country it targets: one-off points plus monthly points over its
+ * whole run (positive = good for the target). Heavy ones only fit a major development.
+ */
+export function targetWeight(id: EffectId): number {
+  const def = EFFECTS[id]
+  return weightOf(
+    def.modifiers.filter((m) => m.on !== 'actor'),
+    def.durationTurns ?? 6
+  )
+}
 
 /** Player moves offered as ready-made cards: shortcuts, the typed order is the real game. */
 export const CARD_EFFECT_IDS = PLAYER_EFFECT_IDS.filter((id) => EFFECTS[id].card !== false)

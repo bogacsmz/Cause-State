@@ -12,12 +12,15 @@ export interface NewGameOptions {
   /** Dice seed; the same seed gives the same game. */
   seed?: number
   startDate?: string
+  /** Months between elections (default ELECTION_EVERY_TURNS). */
+  electionEveryTurns?: number
 }
 
 /** A fresh world at turn 0: no effects, no history, full political capital, election in a year. */
 export function createNewGame(opts: NewGameOptions): GameState {
   const startDate = opts.startDate ?? '2026-01-01'
   const player = opts.playerCountryId ?? 'TUR'
+  const every = opts.electionEveryTurns ?? ELECTION_EVERY_TURNS
   return GameState.parse({
     version: 1,
     gameId: opts.gameId,
@@ -26,14 +29,14 @@ export function createNewGame(opts: NewGameOptions): GameState {
     playerCountryId: player,
     status: 'playing',
     ending: null,
-    election: { nextTurn: ELECTION_EVERY_TURNS, everyTurns: ELECTION_EVERY_TURNS, threshold: ELECTION_THRESHOLD, last: null, won: 0 },
+    election: { nextTurn: every, everyTurns: every, threshold: ELECTION_THRESHOLD, last: null, won: 0 },
     politicalCapital: { current: CAPITAL_PER_TURN, perTurn: CAPITAL_PER_TURN, max: CAPITAL_PER_TURN },
     countries: START_COUNTRIES.map((c) => ({
       ...c,
       bars: { ...c.bars },
       anchors: { ...c.bars },
       // The player's election follows the game calendar (one turn = one month).
-      nextElection: c.id === player ? addMonths(startDate, ELECTION_EVERY_TURNS) : c.nextElection
+      nextElection: c.id === player ? addMonths(startDate, every) : c.nextElection
     })),
     provinces: START_PROVINCES.map((p) => ({ ...p })),
     effects: [],

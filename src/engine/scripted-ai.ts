@@ -1,5 +1,6 @@
 import { EFFECTS, type EffectId } from '@shared/game/catalog'
-import type { ChangeList, ForeignIntent, SeedOutcome, SeedPlan, SeedProposal } from '@shared/game/contract'
+import { LIMITS, type ChangeList, type Development, type ForeignIntent, type SeedOutcome, type SeedPlan, type SeedProposal } from '@shared/game/contract'
+import { consequenceFits, type Beat, type ConsequenceTone, type Impact, type Lasts, type Tone } from '@shared/game/impacts'
 import { countryRef, entityKey, type Bars, type EntityRef } from '@shared/game/primitives'
 import type { GameState, Seed } from '@shared/game/schema'
 import { mentionedEntities } from './context'
@@ -8,6 +9,8 @@ import { checkDecision, explainIssue } from './referee'
 import { ek } from '@shared/tr'
 import { coupChance, DYNAMICS } from './dynamics'
 import { hashRoll } from './rng'
+import { fitText } from './util'
+import { moveWeightOn } from './weight'
 
 // Phase 1's stand-in for the LLM. It speaks the exact same contract (a ChangeList the
 // referee must approve), but with scripted rules instead of a model. Phase 2 replaces
@@ -194,84 +197,135 @@ const SEED_SCRIPTS: Partial<Record<EffectId, readonly SeedScript[]>> = {
 }
 
 /**
- * The world moves on its own too. Now and then the AI notices a storm gathering abroad:
- * it shows up in the news first (the foreshadowing), and the code decides if and when it hits.
+ * The world's own developments, by tone. The code (director.ts) decides when one comes and
+ * in which tone; the scripted rules pick one of these, preferring the stage the director chose.
  */
-interface WorldScript extends SeedScript {
-  /** The line in this turn's news that hints at it, and a headline for a quiet month. */
-  foreshadow: string
-  teaser: string
+interface DevelopmentScript {
+  stage: 'home' | 'country' | 'world'
+  /** The country behind it, for country-stage scripts. */
+  actor?: string
+  title: string
+  story: string
+  moves?: readonly EffectId[]
+  impacts?: readonly Impact[]
+  lasts?: Lasts
 }
 
-/** Chance per turn that a new world development starts brewing. */
-export const WORLD_EVENT_CHANCE = 0.3
+const up = (bar: Impact['bar'], size: Impact['size'] = 'small', monthly = false): Impact => ({ bar, change: 'up', size, monthly })
+const down = (bar: Impact['bar'], size: Impact['size'] = 'small', monthly = false): Impact => ({ bar, change: 'down', size, monthly })
 
-const WORLD_SCRIPTS: readonly WorldScript[] = [
-  {
-    key: 'rus-gazi',
-    teaser: "Moskova'dan doğalgaz sinyali",
-    dormancy: 'medium',
-    likelihood: 'possible',
-    actor: 'RUS',
-    outcome: 'energy_cutoff',
-    foreshadow: 'Dünya gündemi: Moskova doğalgaz fiyatları için yeni pazarlık istiyor, sert sinyaller veriyor.',
-    hook: () => 'Rusya doğalgaz anlaşmasını yeniden masaya yatırmak istiyor; vanayı kısmakla tehdit ediyor.',
-    headline: 'Moskova vanayı kıstı',
-    body: ({ planted }) => `Tur ${ek(planted, 'de')} gelen sinyaller doğru çıktı: Rusya doğalgaz akışını kıstı. Fabrikalar ve evler zor günlere hazırlanıyor.`
-  },
-  {
-    key: 'emtia',
-    teaser: "Küresel fiyatlar tırmanıyor",
-    dormancy: 'medium',
-    likelihood: 'possible',
-    actor: 'world',
-    outcome: 'inflation_spike',
-    foreshadow: 'Dünya gündemi: küresel emtia fiyatları tırmanıyor, ithalat faturası kabarıyor.',
-    hook: () => 'Küresel emtia fiyatları tırmanıyor; ithalat faturası er geç rafları vuracak.',
-    headline: 'İthal enflasyon kapıda',
-    body: ({ planted }) => `Tur ${ek(planted, 'de')} başlayan küresel fiyat artışı sonunda raflara yansıdı. Market fişleri kabardı.`
-  },
-  {
-    key: 'turizm',
-    teaser: "Alman turizmcilerin gözü Ege'de",
-    dormancy: 'medium',
-    likelihood: 'possible',
-    actor: 'DEU',
-    outcome: 'foreign_investment',
-    foreshadow: "Dünya gündemi: Alman turizm şirketleri Ege kıyılarında yatırım fırsatı arıyor.",
-    hook: () => "Alman turizm şirketleri Ege'de yatırım fırsatı kolluyor.",
-    headline: "Alman sermayesi Ege'de",
-    body: ({ planted }) => `Tur ${ek(planted, 'de')} konuşulan turizm yatırımları gerçek oldu. Alman şirketleri yeni oteller için imzayı attı.`
-  },
-  {
-    key: 'sinir-otesi',
-    teaser: "Sınır ötesinde çatışma",
-    dormancy: 'short',
-    likelihood: 'possible',
-    actor: 'world',
-    outcome: 'regional_tension',
-    foreshadow: 'Dünya gündemi: sınır ötesinde çatışmalar tırmanıyor, göç dalgası endişesi büyüyor.',
-    hook: () => 'Sınır ötesinde çatışmalar tırmanıyor; kıvılcım sınırın bu yanına sıçrayabilir.',
-    headline: 'Sınırda tansiyon yükseldi',
-    body: ({ planted }) => `Tur ${ek(planted, 'den')} beri süren sınır ötesi çatışmalar sonunda bu yakaya taştı. Güvenlik alarmı verildi.`
-  },
-  {
-    key: 'abd-ticaret',
-    teaser: "Washington'dan ticaret sinyali",
-    dormancy: 'medium',
-    likelihood: 'possible',
-    actor: 'USA',
-    outcome: 'trade_agreement',
-    foreshadow: 'Dünya gündemi: Washington bölgede yeni ticaret ortakları arıyor.',
-    hook: () => 'Washington bölgede yeni ticaret ortakları arıyor; Ankara listede.',
-    headline: 'Washington kapıyı açtı',
-    body: ({ planted }) => `Tur ${ek(planted, 'de')} konuşulmaya başlanan ticaret çerçevesi imzalandı. ABD pazarı Türk ürünlerine açılıyor.`
-  }
-]
+const DEVELOPMENT_SCRIPTS: Record<Tone, readonly DevelopmentScript[]> = {
+  opportunity: [
+    {
+      stage: 'country',
+      actor: 'AZE',
+      title: `Bakü'den yeni boru hattı teklifi`,
+      story: `Azerbaycan, Avrupa'ya giden gazın bir kolunu Trakya üzerinden geçirmeyi önerdi. Masada transit geliri ve indirimli gaz var.`,
+      impacts: [up('reputation'), up('economy')],
+      lasts: 'month'
+    },
+    {
+      stage: 'country',
+      actor: 'DEU',
+      title: `Alman sanayiciler üretim üssü arıyor`,
+      story: `Alman otomotiv tedarikçileri Çin'e bağımlılığı azaltmak için yakın coğrafyada fabrika yeri arıyor; Bursa ve Kocaeli listede.`,
+      moves: ['foreign_investment']
+    },
+    {
+      stage: 'world',
+      title: `Körfez fonları yeniden yolda`,
+      story: `Faizlerin gevşemesiyle Körfez varlık fonları gelişmekte olan piyasalara döndü. İstanbul borsasına ilk girişler başladı.`,
+      impacts: [up('economy', 'small', true)],
+      lasts: 'season'
+    },
+    {
+      stage: 'home',
+      title: `Genç yazılımcılar dalgası`,
+      story: `İstanbul ve Ankara'daki genç girişimler art arda yatırım aldı. Teknoparklar yeni kira talebine yetişemiyor.`,
+      impacts: [up('economy'), up('approval')],
+      lasts: 'month'
+    }
+  ],
+  good: [
+    {
+      stage: 'home',
+      title: `Rekor turizm sezonu`,
+      story: `Antalya ve Muğla'da oteller haziranın ilk haftasında doldu. Esnaf yüzü gülen bir yaz bekliyor.`,
+      impacts: [up('economy', 'clear'), up('approval')],
+      lasts: 'month'
+    },
+    {
+      stage: 'world',
+      title: `Petrol fiyatları geriledi`,
+      story: `Küresel talebin yavaşlamasıyla petrol fiyatları düştü; akaryakıt zamları geri alındı, enerji faturası hafifledi.`,
+      impacts: [up('economy', 'small', true), up('welfare')],
+      lasts: 'season'
+    },
+    {
+      stage: 'country',
+      actor: 'GBR',
+      title: `Londra'dan açık destek`,
+      story: `İngiltere Dışişleri, Türkiye'nin bölgesel arabuluculuk rolünü öven bir açıklama yaptı.`,
+      moves: ['diplomatic_support']
+    },
+    {
+      stage: 'home',
+      title: `Bayram havası`,
+      story: `Milli maçtaki galibiyetin ardından meydanlar doldu; siyasi gerilim bir haftalığına unutuldu.`,
+      moves: ['public_goodwill']
+    }
+  ],
+  neutral: [
+    {
+      stage: 'home',
+      title: `Meclis'te anayasa tartışması`,
+      story: `Yeni anayasa taslağı komisyonda saatlerce tartışıldı; muhalefet süreci "aceleye getirilmiş" buldu.`,
+      impacts: [down('stability'), up('approval')],
+      lasts: 'month'
+    },
+    {
+      stage: 'world',
+      title: `Avrupa sandık başında`,
+      story: `Komşu ülkelerdeki seçimlerde popülist partiler güçlendi. Ankara'da sonuçların göç politikasına etkisi konuşuluyor.`
+    },
+    {
+      stage: 'country',
+      actor: 'RUS',
+      title: `Moskova'dan belirsiz sinyaller`,
+      story: `Kremlin, Karadeniz'deki tahıl koridoru için yeni bir çerçeve istediğini duyurdu; ayrıntı vermedi.`
+    }
+  ],
+  trouble: [
+    {
+      stage: 'home',
+      title: `Liman işçileri iş bıraktı`,
+      story: `Mersin ve İzmir limanlarında işçiler ücret zammı için iş bıraktı; konteynerler rıhtımda bekliyor.`,
+      moves: ['strike_wave']
+    },
+    {
+      stage: 'country',
+      actor: 'RUS',
+      title: `Bankalara siber saldırı`,
+      story: `Üç büyük bankanın sistemleri saatlerce çöktü; izler Rusya bağlantılı bir gruba çıkıyor.`,
+      moves: ['cyber_attack']
+    },
+    {
+      stage: 'world',
+      title: `Buğday fiyatları tırmandı`,
+      story: `Karadeniz'deki kuraklık dünya buğday fiyatlarını sıçrattı; fırıncılar ekmeğe zam için kapıda.`,
+      impacts: [down('welfare', 'small', true), down('approval')],
+      lasts: 'season'
+    },
+    {
+      stage: 'home',
+      title: `İhale skandalı`,
+      story: `Bir belediye ihalesindeki ses kayıtları sızdı; muhalefet bakanın istifasını istiyor.`,
+      moves: ['scandal']
+    }
+  ]
+}
 
-const SCRIPTS_BY_KEY = new Map(
-  [...Object.values(SEED_SCRIPTS).flat(), ...WORLD_SCRIPTS].map((s) => [s.key, s] as const)
-)
+const SCRIPTS_BY_KEY = new Map(Object.values(SEED_SCRIPTS).flat().map((s) => [s.key, s] as const))
 
 /** Immediate reactions from other countries to a decision. */
 const REACTIONS: Partial<Record<EffectId, (d: Decision) => { actor: string; reason: string } | null>> = {
@@ -425,7 +479,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   const changes = input.decisions.map((d) => ({
     effectId: d.effectId,
     target: d.target,
-    reason: d.reason ?? `${EFFECTS[d.effectId].label} kararı${d.target.id === player ? '' : ` (${name(d.target)})`}.`
+    reason: fitText(d.reason ?? `${EFFECTS[d.effectId].label} kararı${d.target.id === player ? '' : ` (${name(d.target)})`}.`, LIMITS.reasonChars)
   }))
 
   const foreignIntents: ForeignIntent[] = []
@@ -441,27 +495,9 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
   }
 
   const newSeeds: SeedProposal[] = []
-  // The world first: a development abroad that may hit later.
-  const worldLines: string[] = []
-  let worldTeaser: string | undefined
-  if (hashRoll(`${state.gameId}|world|${turn}`) < WORLD_EVENT_CHANCE) {
-    const script = WORLD_SCRIPTS[Math.floor(hashRoll(`${state.gameId}|world-pick|${turn}`) * WORLD_SCRIPTS.length)]!
-    const actorRef = script.actor === 'world' ? null : countryRef(script.actor)
-    newSeeds.push({
-      source: null,
-      hook: script.hook({ turn, target: name(playerRef) }),
-      entities: uniqueRefs([playerRef, ...(actorRef ? [actorRef] : [])]),
-      tags: [script.key, ...EFFECTS[script.outcome].tags.slice(0, 2)],
-      dormancy: script.dormancy,
-      likelihood: script.likelihood,
-      condition: null
-    })
-    worldLines.push(script.foreshadow)
-    worldTeaser = script.teaser
-  }
   for (const d of input.decisions) {
     for (const script of SEED_SCRIPTS[d.effectId] ?? []) {
-      if (newSeeds.length >= 3) break
+      if (newSeeds.length >= LIMITS.newSeeds) break
       const actorRef = script.actor === 'world' ? null : countryRef(script.actor === 'target' ? d.target.id : script.actor)
       const entities = uniqueRefs([playerRef, ...(d.target.id !== player ? [d.target] : []), ...(actorRef ? [actorRef] : [])])
       newSeeds.push({
@@ -478,22 +514,35 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
 
   const seedOutcomes: SeedOutcome[] = []
   const seedHeadlines: string[] = []
+  const seedLines: string[] = []
   const used = new Set<string>()
   for (const seed of input.plan.firing) {
-    const { outcome, headline } = resolveSeed(state, seed, used)
+    const { outcome, headline } = resolveSeed(state, seed, used, input.plan.seedTone)
     seedOutcomes.push(outcome)
+    seedLines.push(outcome.reason)
     if (headline) seedHeadlines.push(headline)
+  }
+
+  // The world's own development, when the code planned one this month (never a move already used this month).
+  const developments: Development[] = []
+  const developmentLines: string[] = []
+  const beat = input.plan.beat ?? null
+  if (beat) {
+    const development = scriptedDevelopment(state, beat, turn, used)
+    developments.push(development)
+    developmentLines.push(development.story)
   }
 
   const turnsLeft = state.election.nextTurn - turn
   const decisionLabels = input.decisions.map((d) => EFFECTS[d.effectId].label.toLocaleLowerCase('tr'))
-  // Fired seeds have their own card in the news; the narration only leads with their headline.
+  // A consequence coming back is part of the month's story, told with where it came from.
   const body = [
+    ...seedLines,
     decisionLabels.length > 0
       ? `Hükümet bu ay şu adımları attı: ${decisionLabels.join(', ')}.`
       : quietLine(state),
     ...reactionLines,
-    ...worldLines,
+    ...developmentLines,
     turnsLeft > 0 && turnsLeft <= 3 ? `Seçime ${turnsLeft} ay kaldı.` : '',
     turnsLeft === 0 ? 'Seçmen bu ay sandığa gidiyor; hükümetin kaderi oy pusulalarında.' : ''
   ]
@@ -506,7 +555,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
     seedHeadlines[0] ??
     (electionDay ? 'Türkiye sandık başında' : undefined) ??
     (firstDecision ? HEADLINES[firstDecision.effectId] : undefined) ??
-    worldTeaser ??
+    developments[0]?.title ??
     quietHeadline(state, turn)
 
   return {
@@ -520,6 +569,7 @@ export function scriptedChangeList(state: GameState, input: ScriptInput): Change
     foreignIntents,
     newSeeds,
     seedOutcomes,
+    developments,
     narration: { headline: headline.slice(0, 120), body: body.slice(0, 1500) }
   }
 }
@@ -551,12 +601,23 @@ function quietLine(state: GameState): string {
 function resolveSeed(
   state: GameState,
   seed: Seed,
-  used: Set<string>
+  used: Set<string>,
+  tone?: ConsequenceTone
 ): { outcome: SeedOutcome; headline?: string } {
   const player = state.playerCountryId
   const script = SCRIPTS_BY_KEY.get(seed.tags[0] ?? '')
+  // A hook the AI planted may already fill the whole length a reason allows.
   const storyOnly = (reason: string): { outcome: SeedOutcome } => ({
-    outcome: { seedId: seed.id, actor: null, effectId: null, target: null, reason }
+    outcome: {
+      seedId: seed.id,
+      actor: null,
+      effectId: null,
+      target: null,
+      reason: fitText(reason, LIMITS.reasonChars),
+      title: 'Geçmişin yankısı',
+      impacts: [],
+      lasts: 'month'
+    }
   })
   if (!script) return storyOnly(`Geçmişten bir yankı: ${seed.hook}`)
 
@@ -579,10 +640,39 @@ function resolveSeed(
   if (busy || (script.actor !== 'world' && actorId === null)) {
     return storyOnly(`${body} Etkisi zaten sürenlerle birleşti.`)
   }
+  // The code rolled the tone it comes back in; the scripted rules have no story of the other
+  // colour, so such a consequence is only told (Claude writes one in the rolled tone).
+  if (tone && !consequenceFits(tone, moveWeightOn(state, script.outcome, effectActor, target, player))) {
+    return storyOnly(`Geçmişten bir yankı: ${seed.hook}`)
+  }
   used.add(`${script.outcome}|${effectActor}`)
   return {
-    outcome: { seedId: seed.id, actor: actorId, effectId: script.outcome, target, reason: body },
+    outcome: { seedId: seed.id, actor: actorId, effectId: script.outcome, target, reason: body, title: script.headline, impacts: [], lasts: 'month' },
     headline: script.headline
+  }
+}
+
+/** A development of the planned tone, preferring the stage the director chose. */
+function scriptedDevelopment(state: GameState, beat: Beat, turn: number, used: ReadonlySet<string>): Development {
+  const player = state.playerCountryId
+  // A unique move already running (or already used this month) between the same pair cannot start again.
+  const running = (id: EffectId, actor: string): boolean =>
+    EFFECTS[id].unique &&
+    (used.has(`${id}|${actor}`) || state.effects.some((e) => e.effectId === id && e.actor === actor && e.target.type === 'country' && e.target.id === player))
+  const pool = DEVELOPMENT_SCRIPTS[beat.tone].filter(
+    (d) => (!d.actor || (d.actor !== player && findCountry(state, d.actor))) && !(d.moves ?? []).some((id) => running(id, d.actor ?? player))
+  )
+  const onStage = pool.filter((d) => d.stage === beat.stage.kind)
+  const choices = onStage.length > 0 ? onStage : pool.length > 0 ? pool : DEVELOPMENT_SCRIPTS.neutral.filter((d) => !d.moves)
+  const script = choices[Math.floor(hashRoll(`${state.gameId}|development|${turn}`) * choices.length)]!
+  return {
+    title: script.title,
+    story: script.story,
+    actor: script.actor ?? null,
+    target: countryRef(player),
+    moves: [...(script.moves ?? [])],
+    impacts: [...(script.impacts ?? [])],
+    lasts: script.lasts ?? 'month'
   }
 }
 

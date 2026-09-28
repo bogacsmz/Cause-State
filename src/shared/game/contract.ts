@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { EffectId } from './catalog'
+import { Impact, Lasts, MAX_IMPACTS, type Beat, type ConsequenceTone, type Scale } from './impacts'
 import { Bars, CountryId, EntityRef, IsoDate, Turn } from './primitives'
 import { Dormancy, Likelihood, Regime, SeedCondition, type GameEvent, type GameState, type Seed, type TurnReport } from './schema'
 
@@ -13,9 +14,14 @@ export const LIMITS = {
   changes: 4,
   /** Other countries act sparingly: at most this many moves a month. */
   foreignIntents: 2,
-  newSeeds: 3,
-  seedOutcomes: 3,
-  firingSeeds: 3,
+  /** Delayed consequences planted per month: only decisions with a real story in them. */
+  newSeeds: 2,
+  /** At most one delayed consequence comes back in a month; calm months are normal. */
+  seedOutcomes: 1,
+  firingSeeds: 1,
+  /** At most one development of the world's own per month (the code decides whether there is one). */
+  developments: 1,
+  titleChars: 90,
   reasonChars: 300,
   seedHookChars: 300,
   activeEffects: 10,
@@ -164,9 +170,34 @@ export const SeedOutcome = z.strictObject({
   actor: CountryId.nullable(),
   effectId: EffectId.nullable(),
   target: EntityRef.nullable(),
-  reason: Reason
+  reason: Reason,
+  /** Its own headline ("Sansürün faturası meydanlarda"); the catalog label when missing. */
+  title: z.string().min(1).max(LIMITS.titleChars).optional(),
+  /** An improvised shape instead of (or on top of) the catalog move; lands on `target`, or the player. */
+  impacts: z.array(Impact).max(MAX_IMPACTS).default([]),
+  lasts: Lasts.default('month')
 })
-export type SeedOutcome = z.infer<typeof SeedOutcome>
+/** As the code reads it, defaults filled in. */
+export type SeedOutcome = z.output<typeof SeedOutcome>
+
+/**
+ * Something the world brings this month on its own: the code decided that there is one and
+ * in which tone (the month's Beat); the AI decides what it is. It is told as its own story and
+ * lands on `target` through catalog moves done by `actor`, improvised impacts, or both;
+ * with neither it is only a story.
+ */
+export const Development = z.strictObject({
+  title: z.string().min(1).max(LIMITS.titleChars),
+  story: Reason,
+  /** The country behind it, or null for society, markets, nature or the world at large. */
+  actor: CountryId.nullable(),
+  /** Usually the player's country. */
+  target: EntityRef,
+  moves: z.array(EffectId).max(2),
+  impacts: z.array(Impact).max(MAX_IMPACTS),
+  lasts: Lasts
+})
+export type Development = z.infer<typeof Development>
 
 export const Narration = z.strictObject({
   headline: z.string().min(1).max(120),
@@ -181,22 +212,32 @@ export const ChangeList = z.strictObject({
   foreignIntents: z.array(ForeignIntent).max(LIMITS.foreignIntents),
   newSeeds: z.array(SeedProposal).max(LIMITS.newSeeds),
   seedOutcomes: z.array(SeedOutcome).max(LIMITS.seedOutcomes),
+  developments: z.array(Development).max(LIMITS.developments).default([]),
   narration: Narration
 })
-export type ChangeList = z.infer<typeof ChangeList>
+/** A proposal as the AI (or the scripted rules) writes it: fields with a default may be left out. */
+export type ChangeList = z.input<typeof ChangeList>
+/** The same list once parsed, every default filled in. */
+export type ParsedChangeList = z.output<typeof ChangeList>
 
 declare const approved: unique symbol
 /** A ChangeList the referee accepted. Only `reviewChangeList` produces one. */
-export type ApprovedChangeList = ChangeList & { readonly [approved]: true }
+export type ApprovedChangeList = ParsedChangeList & { readonly [approved]: true }
 
 // ── turn loop ───────────────────────────────────────────────────────────────
 
-/** Which seeds wake up this turn, decided by code before the AI is asked anything. */
+/** What the month holds, decided by code before the AI is asked anything (src/engine/director.ts). */
 export interface SeedPlan {
   /** Fire now; the ChangeList must give each one an outcome. */
   firing: Seed[]
   /** Slept too long without firing; they quietly fade. */
   fizzled: Seed[]
+  /** The world's own development this month, if any: its tone, size and where it starts. */
+  beat?: Beat | null
+  /** How big a consequence coming back this month may be. */
+  seedScale?: Scale
+  /** The tone it comes back in. */
+  seedTone?: ConsequenceTone
 }
 
 export interface TurnAction {

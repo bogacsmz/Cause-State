@@ -99,7 +99,7 @@ export function tickBars(next: GameState, startBars: ReadonlyMap<string, Bars>, 
  * it, "Yaptırım → Yunanistan" when it was aimed at Greece, just "Yaptırım" when it is home-grown.
  */
 function causeLabel(state: GameState, effect: ActiveEffect, affected: string): string {
-  const label = EFFECTS[effect.effectId].label
+  const label = effect.label ?? EFFECTS[effect.effectId].label
   if (effect.actor !== affected) return `${label} · ${entityName(state, countryRef(effect.actor))}`
   const aimedAt = effect.target.type === 'province' || effect.target.id !== affected ? effect.target : null
   return aimedAt ? `${label} → ${entityName(state, aimedAt)}` : label

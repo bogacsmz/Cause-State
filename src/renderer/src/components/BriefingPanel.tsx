@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { ChatEntry, FeedEvent, GameView } from '@shared/game/view'
-import { ek } from '@shared/tr'
 import { lineTone, monthYear, prettyLine } from '../lib/format'
 import type { LiveChat, LiveTurn } from '../lib/useGame'
 
@@ -8,6 +7,7 @@ import type { LiveChat, LiveTurn } from '../lib/useGame'
 // the decisions and the conversation already say what the player asked for.
 const ORDER: Partial<Record<FeedEvent['kind'], number>> = {
   narration: 0,
+  development: 1,
   seed_fired: 1,
   election: 2,
   coup: 2,
@@ -104,21 +104,9 @@ function FeedItem({ event: e }: { event: FeedEvent }): React.JSX.Element {
           <p className="news__body">{e.summary}</p>
         </article>
       )
-    case 'seed_fired': {
-      const butterfly = e.origin?.butterfly ?? true
-      return (
-        <article className={`echo ${butterfly ? 'echo--butterfly' : 'echo--world'}`}>
-          <span className="echo__tag">{butterfly ? 'Kelebek etkisi' : 'Dünya gündemi'}</span>
-          <h3 className="echo__title">{e.title.replace(/^(Kelebek etkisi|Dünya gündemi): /, '')}</h3>
-          <p className="echo__body">{e.summary}</p>
-          {e.origin && (
-            <p className="echo__origin">
-              {butterfly ? `Kaynağı: Tur ${e.origin.turn} · ${e.origin.label}` : `Tur ${ek(e.origin.turn, 'de')} haberlere düşmüştü`}
-            </p>
-          )}
-        </article>
-      )
-    }
+    case 'development':
+    case 'seed_fired':
+      return <Happening event={e} />
     case 'election':
       return (
         <article className={`verdict ${e.title.startsWith('Seçim kazanıldı') ? 'verdict--won' : 'verdict--lost'}`}>
@@ -159,6 +147,19 @@ function FeedItem({ event: e }: { event: FeedEvent }): React.JSX.Element {
     default:
       return <p className="line line--faint">{e.title}</p>
   }
+}
+
+/**
+ * Something the month brought: the world's own news, or an earlier decision coming back.
+ * Both read as news; where a consequence came from is in its story, not on a label.
+ */
+export function Happening({ event: e }: { event: FeedEvent }): React.JSX.Element {
+  return (
+    <article className={`happening happening--${e.tone ?? 'neutral'}${e.major ? ' happening--major' : ''}`}>
+      <h3 className="happening__title">{e.title}</h3>
+      <p className="happening__body">{e.summary}</p>
+    </article>
+  )
 }
 
 function Chat({ entry: c }: { entry: ChatEntry }): React.JSX.Element {

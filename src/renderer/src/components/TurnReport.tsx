@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import type { GameView } from '@shared/game/view'
 import { ek } from '@shared/tr'
 import { monthYear, percent, signed } from '../lib/format'
+import { Happening } from './BriefingPanel'
 import { Delta } from './NationPanel'
 
-// The end-of-turn sheet: what moved, and why. The butterfly, if one came back, goes first.
+// The end-of-turn sheet: what moved, and why. What the month brought (the world's own news,
+// earlier decisions coming back) goes first, told as news.
 export function TurnReport({ view, onClose }: { view: GameView; onClose: () => void }): React.JSX.Element | null {
   const report = view.report
   const continueRef = useRef<HTMLButtonElement>(null)
@@ -22,7 +24,7 @@ export function TurnReport({ view, onClose }: { view: GameView; onClose: () => v
   }, [onClose])
   if (!report) return null
 
-  const echoes = view.feed.filter((e) => e.turn === report.turn && e.kind === 'seed_fired')
+  const happenings = view.feed.filter((e) => e.turn === report.turn && (e.kind === 'seed_fired' || e.kind === 'development'))
   // Same order as the desk: approval first.
   const order = view.player.bars.map((b) => b.id)
   const moved = report.bars
@@ -40,20 +42,13 @@ export function TurnReport({ view, onClose }: { view: GameView; onClose: () => v
           </h2>
         </header>
 
-        {echoes.map((e) => (
-          <div key={e.id} className={`sheet__echo${e.origin?.butterfly === false ? ' sheet__echo--world' : ''}`}>
-            <span className="echo__tag">{e.origin?.butterfly === false ? 'Dünya gündemi' : 'Kelebek etkisi'}</span>
-            <strong>{e.title.replace(/^(Kelebek etkisi|Dünya gündemi): /, '')}</strong>
-            <p>{e.summary}</p>
-            {e.origin && (
-              <p className="echo__origin">
-                {e.origin.butterfly
-                  ? `Tur ${ek(e.origin.turn, 'de')} verdiğin "${e.origin.label}" kararı geri döndü.`
-                  : `Tur ${ek(e.origin.turn, 'de')} haberlere düşmüştü.`}
-              </p>
-            )}
+        {happenings.length > 0 && (
+          <div className="sheet__happenings">
+            {happenings.map((e) => (
+              <Happening key={e.id} event={e} />
+            ))}
           </div>
-        ))}
+        )}
 
         {report.election && (
           <div className={`sheet__verdict ${report.election.won ? 'sheet__verdict--won' : 'sheet__verdict--lost'}`}>

@@ -39,6 +39,20 @@ export function truncate(text: string, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`
 }
 
+/**
+ * Shortens text to `max` characters at a sentence end when there is one in the last third,
+ * otherwise at a word, with an ellipsis. Too-long prose is trimmed, not sent back for repair.
+ */
+export function fitText(text: string, max: number): string {
+  const clean = text.trim()
+  if (clean.length <= max) return clean
+  const head = clean.slice(0, max)
+  const stop = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '), head.endsWith('.') ? head.length - 1 : -1)
+  if (stop >= max * 0.6) return head.slice(0, stop + 1)
+  const space = head.lastIndexOf(' ', max - 2)
+  return `${head.slice(0, space > max * 0.6 ? space : max - 1).replace(/[\s,;:–-]+$/, '')}…`
+}
+
 /** Rough token estimate for budgeting (conservative for Turkish text and JSON). */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3)

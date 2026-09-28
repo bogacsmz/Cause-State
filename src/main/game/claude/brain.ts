@@ -1,14 +1,17 @@
 import { EFFECTS, type EffectId } from '@shared/game/catalog'
-import type { ChangeList, ProposedChange, SeedPlan, TurnOutcome } from '@shared/game/contract'
-import { BAR_LABELS, type EntityRef } from '@shared/game/primitives'
+import { LIMITS, type ChangeList, type SeedPlan, type TurnOutcome } from '@shared/game/contract'
+import { MAJOR_TAG, TONE_TAGS, type Beat } from '@shared/game/impacts'
+import { BAR_LABELS, countryRef, type EntityRef } from '@shared/game/primitives'
 import type { GameEvent, GameState, Seed } from '@shared/game/schema'
 import { monthYear } from '@shared/tr'
 import type { AiResult, AiUsage } from '@shared/ipc'
 import { buildTurnRequest } from '../../../engine/context'
+import type { Happening } from '../../../engine/director'
 import { entityName, findCountry } from '../../../engine/lookup'
 import { checkDecision, explainIssue, formatIssuesForRepair, type RefereeIssue } from '../../../engine/referee'
 import { resolveTurn, withNarration, type TurnResolution } from '../../../engine/resolve'
-import { spotlight } from '../../../engine/spotlight'
+import { monthFocus, spotlight } from '../../../engine/spotlight'
+import { fitText } from '../../../engine/util'
 import { interpretOrder, scriptedChangeList } from '../../../engine/scripted-ai'
 import type { Effort, LlmProvider } from '../../ai/types'
 import { INTERPRET_SYSTEM, NARRATE_SYSTEM, RESOLVE_SYSTEM } from './prompts'
@@ -90,6 +93,8 @@ export interface ResolveInput {
   /** Dormant seeds touching what this month is about, for continuity. */
   relevantSeeds: readonly Seed[]
   recentEvents: readonly GameEvent[]
+  /** Recent developments and consequences, for the month's pacing (director.ts). */
+  past?: readonly Happening[]
 }
 
 export interface ResolveResult {
@@ -122,7 +127,7 @@ export class ScriptedBrain implements GameBrain {
   }
 
   async resolve(input: ResolveInput, hooks: BrainHooks = {}): Promise<ResolveResult> {
-    const resolution = await resolveTurn(input.state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds })
+    const resolution = await resolveTurn(input.state, turnInput(input))
     if (!resolution.ok) throw new Error(`scripted turn rejected: ${resolution.issues.map((i) => i.message).join('; ')}`)
     const { narration } = resolution.outcome
     hooks.onNarration?.(`${narration.headline}\n\n${narration.body}`)
@@ -201,7 +206,7 @@ export class ClaudeBrain implements GameBrain {
       const reply = parsed.data
       hooks.onReply?.(reply.reply, attempt)
       const discussed = [...new Set(reply.discussed)].slice(0, 3) as EffectId[]
-      const decisions = reply.decisions.map((d) => ({ effectId: d.effectId as EffectId, target: d.target as EntityRef, reason: d.reason.trim() }))
+      const decisions = reply.decisions.map((d) => ({ effectId: d.effectId as EffectId, target: d.target as EntityRef, reason: fitText(d.reason, LIMITS.reasonChars) }))
 
       if (reply.kind === 'talk' || decisions.length === 0) {
         log([])
@@ -248,8 +253,6 @@ export class ClaudeBrain implements GameBrain {
     const { state } = input
     const orders = input.orders.join('\n')
     let fallback: string | undefined
-    // The code decides who moves abroad this month; Claude decides what they do.
-    const onStage = spotlight(state, input.decisions)
     // Each world proposal is logged once the referee has judged it: its objections arrive
     // as the next attempt's feedback, or with the final resolution.
     let unjudged: BrainCall | null = null
@@ -260,8 +263,11 @@ export class ClaudeBrain implements GameBrain {
 
     const makeProposer = (plan: SeedPlan) => {
       let attempt = 0
-      return async (feedback: string | null): Promise<unknown> => {
+      const beat = plan.beat ?? null
+      return async (refereeSays: string | null): Promise<unknown> => {
         attempt += 1
+        // The referee speaks in ChangeList fields; Claude answered in the world reply's.
+        const feedback = refereeSays ? toWireNames(refereeSays) : null
         judge(feedback ? feedback.split('\n').flatMap((line) => (line.startsWith('- ') ? [line.slice(2)] : [])) : [])
         hooks.onPhase?.('world')
         const request = buildTurnRequest({
@@ -271,43 +277,42 @@ export class ClaudeBrain implements GameBrain {
           candidateSeeds: [...input.dueSeeds, ...input.relevantSeeds],
           firing: plan.firing,
           decisions: input.decisions,
-          focus: onStage
+          // The code decides who may answer and where the month's development starts; Claude decides what.
+          focus: monthFocus(state, input.decisions, beat)
         })
-        const payload = JSON.stringify({ playing: playing(state), spotlight: onStage, ...request })
+        const payload = JSON.stringify({
+          playing: playing(state),
+          reactors: spotlight(state, input.decisions),
+          development: beat ? beatForPrompt(beat) : null,
+          consequenceScale: plan.seedScale ?? 'minor',
+          ...(plan.seedTone ? { consequenceTone: plan.seedTone } : {}),
+          ...request
+        })
         const prompt = feedback
           ? `${payload}\n\nThe referee rejected your previous answer. Fix every problem and answer again with the complete JSON document.\n${feedback}`
           : payload
         const answer = await this.call('resolve', state.turn, attempt, prompt, RESOLVE_SYSTEM, hooks, { schema: WORLD_REPLY_SCHEMA, log: false })
         unjudged = callRecord('resolve', state.turn, attempt, prompt, answer, [])
         hooks.onPhase?.('referee')
-        const world = WorldReplyWire.safeParse(safeJson(answer.text))
-        // A malformed answer goes to the referee as is: its schema check sends the reasons back.
-        if (!world.success) return safeJson(answer.text)
-        const proposal: ChangeList = {
-          interpretation: world.data.interpretation,
-          changes: input.decisions.map((d) => ({ effectId: d.effectId, target: d.target, reason: d.reason })),
-          foreignIntents: world.data.foreignIntents as ChangeList['foreignIntents'],
-          newSeeds: world.data.newSeeds as ChangeList['newSeeds'],
-          seedOutcomes: world.data.seedOutcomes as ChangeList['seedOutcomes'],
-          // Placeholder: the newsroom writes the real story once the code has applied the month.
-          narration: { headline: 'Ayın haberi', body: 'Haber, kod ayı uyguladıktan sonra yazılır.' }
-        }
-        return proposal
+        const raw = safeJson(answer.text)
+        const world = WorldReplyWire.safeParse(raw)
+        // A malformed answer still goes to the referee, field by field: its checks send the reasons back.
+        return world.success ? worldProposal(world.data, input.decisions) : looseWorldProposal(raw, input.decisions)
       }
     }
 
     let resolution: TurnResolution
     try {
-      resolution = await resolveTurn(state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds }, makeProposer)
+      resolution = await resolveTurn(state, turnInput(input), makeProposer)
       judge(resolution.ok ? [] : resolution.issues.map((i) => `${i.path || '(root)'}: ${i.message}`))
     } catch (err) {
       judge([`(no verdict: ${errorText(err)})`])
       fallback = `Dünya hamlesi için Claude'a ulaşılamadı (${errorText(err)}); kurallı yedek kullanıldı.`
-      resolution = await resolveTurn(state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds })
+      resolution = await resolveTurn(state, turnInput(input))
     }
     if (!resolution.ok) {
       fallback = `Claude'un dünya önerisi hakemden geçmedi (${resolution.issues.map((i) => i.message).join('; ')}); kurallı yedek kullanıldı.`
-      resolution = await resolveTurn(state, { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds })
+      resolution = await resolveTurn(state, turnInput(input))
     }
     if (!resolution.ok) throw new Error('the scripted fallback was rejected too')
 
@@ -388,43 +393,61 @@ export function narrationFacts(before: GameState, outcome: TurnOutcome, recentEv
   const of = (kind: GameEvent['kind']) => outcome.events.filter((e) => e.kind === kind)
   const report = outcome.report
   const seedById = new Map([...outcome.seedUpdates].map((s) => [s.id, s]))
+  const toneOf = (e: GameEvent): string =>
+    (Object.entries(TONE_TAGS).find(([, tag]) => e.tags.includes(tag))?.[0] ?? 'neutral') + (e.tags.includes(MAJOR_TAG) ? ', major' : '')
+  const others = (e: GameEvent): string | null => {
+    const ref = e.entities.find((r) => r.type === 'country' && r.id !== player)
+    return ref ? name(ref) : null
+  }
+
+  const decisions = of('effect_applied').map((e) => ({
+    move: e.effectId ? EFFECTS[e.effectId].label : e.title,
+    target: e.entities.find((r) => r.id !== player) ? name(e.entities.find((r) => r.id !== player)!) : null,
+    what: e.summary
+  }))
+  const reactions = of('foreign_action').map((e) => ({ country: others(e), move: e.effectId ? EFFECTS[e.effectId].label : e.title, what: e.summary }))
+  const developments = of('development').map((e) => ({ title: e.title, story: e.summary, tone: toneOf(e), where: others(e) }))
+  const consequences = of('seed_fired').map((e) => {
+    const seed = e.seedId ? seedById.get(e.seedId) : undefined
+    return {
+      title: e.title,
+      what: e.summary,
+      tone: toneOf(e),
+      grewFrom: seed
+        ? {
+            month: monthYear(monthOfTurn(before, seed.plantedTurn)),
+            turn: seed.plantedTurn,
+            decision: seed.sourceEffectId ? EFFECTS[seed.sourceEffectId].label : 'dünyadaki bir gelişme'
+          }
+        : null
+    }
+  })
 
   return {
     month: monthYear(state.date),
     turn: state.turn,
     country: findCountry(state, player)?.name ?? player,
-    decisions: of('effect_applied').map((e) => ({
-      move: e.effectId ? EFFECTS[e.effectId].label : e.title,
-      target: e.entities.find((r) => r.id !== player) ? name(e.entities.find((r) => r.id !== player)!) : null,
-      what: e.summary
-    })),
-    otherCountries: of('foreign_action').map((e) => ({ move: e.effectId ? EFFECTS[e.effectId].label : e.title, what: e.summary })),
-    butterflies: of('seed_fired').map((e) => {
-      const seed = e.seedId ? seedById.get(e.seedId) : undefined
-      return {
-        what: e.summary,
-        becomes: e.effectId ? EFFECTS[e.effectId].label : 'yalnızca hikâye',
-        origin: seed
-          ? {
-              month: monthYear(monthOfTurn(before, seed.plantedTurn)),
-              turn: seed.plantedTurn,
-              decision: seed.sourceEffectId ? EFFECTS[seed.sourceEffectId].label : 'dünya gündemi'
-            }
-          : null
-      }
-    }),
-    rumours: outcome.seeds.filter((s) => s.sourceEffectId === null).map((s) => s.hook),
+    quiet: decisions.length + reactions.length + developments.length + consequences.length === 0 && !report.election && !report.coup,
+    decisions,
+    reactions,
+    developments,
+    consequences,
+    brewing: outcome.seeds.filter((s) => s.sourceEffectId === null).map((s) => s.hook),
     election: report.election,
     coup: report.coup ? { chancePercent: Math.round(report.coup.chance * 100), happened: report.coup.happened } : null,
     ending: state.ending ? { title: state.ending.title, detail: state.ending.detail } : null,
+    poll: findCountry(state, player)?.bars.approval ?? null,
     bars: report.bars
       .filter((b) => b.after !== b.before)
       .map((b) => ({
         bar: BAR_LABELS[b.bar],
-        from: b.before,
-        to: b.after,
+        direction: b.after > b.before ? 'yükseldi' : 'düştü',
         because: b.causes.filter((c) => c.kind !== 'noise').map((c) => c.label).slice(0, 4)
       })),
+    running: state.effects
+      .filter((e) => e.source === 'player' && e.appliedTurn < state.turn)
+      .map((e) => e.label ?? EFFECTS[e.effectId].label)
+      .slice(0, 5),
     ended: report.expired,
     recentHeadlines: recentEvents
       .filter((e) => e.kind === 'narration')
@@ -432,6 +455,79 @@ export function narrationFacts(before: GameState, outcome: TurnOutcome, recentEv
       .slice(0, 5)
       .map((e) => e.title)
   }
+}
+
+/** The month's development slot as Claude reads it. */
+function beatForPrompt(beat: Beat): { tone: Beat['tone']; scale: Beat['scale']; stage: Beat['stage']['kind']; country?: string } {
+  return { tone: beat.tone, scale: beat.scale, stage: beat.stage.kind, ...(beat.stage.kind === 'country' ? { country: beat.stage.id } : {}) }
+}
+
+/** Claude's world answer as a ChangeList: the player's approved decisions plus the world's month. */
+export function worldProposal(world: WorldReplyWire, decisions: readonly Commitment[]): ChangeList {
+  const d = world.development
+  // Prose that runs long is trimmed here rather than sent back for a repair round.
+  const title = (t: string): string => fitText(t, LIMITS.titleChars)
+  const prose = (t: string): string => fitText(t, LIMITS.reasonChars)
+  return {
+    interpretation: fitText(world.interpretation, 400),
+    changes: decisions.map((c) => ({ effectId: c.effectId, target: c.target, reason: prose(c.reason) })),
+    foreignIntents: world.reactions.map((r) => ({ ...r, reason: prose(r.reason) })) as ChangeList['foreignIntents'],
+    developments: d
+      ? [
+          {
+            title: title(d.title),
+            story: prose(d.story),
+            actor: d.actor,
+            target: countryRef(d.target),
+            moves: d.moves as EffectId[],
+            impacts: d.impacts,
+            lasts: d.lasts
+          }
+        ]
+      : [],
+    newSeeds: world.newSeeds.map((n) => ({ ...n, hook: fitText(n.hook, LIMITS.seedHookChars) })) as ChangeList['newSeeds'],
+    seedOutcomes: world.consequences.map((c) => ({
+      seedId: c.seedId,
+      actor: c.actor,
+      effectId: c.effectId as EffectId | null,
+      target: c.target as EntityRef | null,
+      reason: prose(c.reason),
+      title: title(c.title),
+      impacts: c.impacts,
+      lasts: c.lasts
+    })),
+    // Placeholder: the newsroom writes the real story once the code has applied the month.
+    narration: { headline: 'Ayın haberi', body: 'Haber, kod ayı uyguladıktan sonra yazılır.' }
+  }
+}
+
+/** A world answer that did not match the schema, mapped field by field so the referee can say what is wrong. */
+function looseWorldProposal(raw: unknown, decisions: readonly Commitment[]): unknown {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return raw
+  const r = raw as Record<string, unknown>
+  const d = r.development as Record<string, unknown> | null | undefined
+  return {
+    interpretation: r.interpretation,
+    changes: decisions.map((c) => ({ effectId: c.effectId, target: c.target, reason: c.reason })),
+    foreignIntents: r.reactions,
+    developments: d && typeof d === 'object' ? [{ ...d, target: typeof d.target === 'string' ? countryRef(d.target) : d.target }] : [],
+    newSeeds: r.newSeeds,
+    seedOutcomes: r.consequences,
+    narration: { headline: 'Ayın haberi', body: 'Haber, kod ayı uyguladıktan sonra yazılır.' }
+  }
+}
+
+/** The referee's paths, renamed to the fields of the world reply Claude writes. */
+function toWireNames(text: string): string {
+  return text
+    .replaceAll('foreignIntents', 'reactions')
+    .replaceAll('seedOutcomes', 'consequences')
+    .replace(/developments\[0\]/g, 'development')
+    .replaceAll('ChangeList', 'answer')
+}
+
+function turnInput(input: ResolveInput) {
+  return { decisions: input.decisions, orders: input.orders, candidateSeeds: input.dueSeeds, past: input.past ?? [] }
 }
 
 /** The month the player is playing now: the turn it becomes and its Turkish name. */

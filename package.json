@@ -32,7 +32,8 @@
     "kanit:harita": "node scripts/harita-kanit.mjs",
     "kanit:harita-renk": "node scripts/harita-renk-kanit.mjs",
     "map:adjacency": "node map/adjacency.mjs",
-    "kanit:harita-komsu": "node scripts/harita-komsu-kanit.mjs"
+    "kanit:harita-komsu": "node scripts/harita-komsu-kanit.mjs",
+    "kanit:cila": "tsx --tsconfig tsconfig.node.json scripts/cila-kanit.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
